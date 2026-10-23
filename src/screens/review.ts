@@ -76,9 +76,14 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
         note,
         h("div", { class: "actions" }, dismiss),
       );
+      el.tabIndex = 0;
+      el.setAttribute("aria-label", `${LABEL[m.kind]} at ${timecode(m.t)}: press Enter to replay`);
       el.onclick = (e) => {
         if (e.target === note || e.target === dismiss) return;
         select(m);
+      };
+      el.onkeydown = (e) => {
+        if (e.key === "Enter" && e.target === el) select(m);
       };
       note.oninput = () => {
         m.note = note.value;
