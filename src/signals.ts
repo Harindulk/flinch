@@ -48,13 +48,30 @@ export function calibrate(frames: Raw[]): Baseline {
 export const zScore = (v: number, s: Stat) => (v - s.mean) / s.sd;
 const clip = (v: number) => Math.max(-3, Math.min(12, v));
 
-/** Smooths calibrated scores over time so a single noisy frame doesn't spike. */
+// The resting level drifts toward the current face: ~20 s to adopt a new normal (15 reads a second),
+// five times slower while the score is high, so a long reaction isn't absorbed straight away.
+const DRIFT = 1 / 300;
+const DRIFT_HIGH = 1 / 1500;
+const HIGH = 2.5;
+
+/**
+ * Scores each face read against the tester's resting face. Smooths over time so one noisy frame
+ * doesn't spike, and lets the resting level drift so minutes of concentrated frowning become
+ * the new normal while sudden reactions still stand out.
+ */
 export class Scorer {
   private last: Raw | null = null;
-  constructor(private base: Baseline, private alpha = 0.4) {}
+  private rest: { f: number; d: number };
+  constructor(private base: Baseline, private alpha = 0.4) {
+    this.rest = { f: base.f.mean, d: base.d.mean };
+  }
 
   push(raw: Raw): Raw {
-    const z = { f: clip(zScore(raw.f, this.base.f)), d: clip(zScore(raw.d, this.base.d)), loud: clip(zScore(raw.loud, this.base.loud)) };
+    const zf = zScore(raw.f, { mean: this.rest.f, sd: this.base.f.sd });
+    const zd = zScore(raw.d, { mean: this.rest.d, sd: this.base.d.sd });
+    this.rest.f += (raw.f - this.rest.f) * (zf > HIGH ? DRIFT_HIGH : DRIFT);
+    this.rest.d += (raw.d - this.rest.d) * (zd > HIGH ? DRIFT_HIGH : DRIFT);
+    const z = { f: clip(zf), d: clip(zd), loud: clip(zScore(raw.loud, this.base.loud)) };
     const a = this.alpha;
     this.last = this.last
       ? { f: a * z.f + (1 - a) * this.last.f, d: a * z.d + (1 - a) * this.last.d, loud: Math.max(z.loud, 0.6 * this.last.loud) }

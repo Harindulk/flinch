@@ -69,7 +69,7 @@ PRD ref: `prd.md > Features and Behavior > Capture`.
 PRD ref: `prd.md > Features and Behavior > Calibration`, `> Live reaction line`.
 
 ### Signal maker
-`src/signals.ts` (pure, unit-tested): `rawSignals(blendshapes)` → `{frustration, delight}`; `calibrate(frames)` → baseline mean and spread per signal (spread has a floor so a perfectly still face doesn't make tiny changes look huge); `score(raw, baseline)` → how many spreads above rest, smoothed.
+`src/signals.ts` (pure, unit-tested): `rawSignals(blendshapes)` → `{frustration, delight}`; `calibrate(frames)` → baseline mean and spread per signal (spread has a floor so a perfectly still face doesn't make tiny changes look huge); `Scorer` → how many spreads above rest, smoothed. The resting level drifts slowly toward the current face (about 20 s to adopt a new normal, five times slower while a score is high), so minutes of concentrated frowning stop counting as frustration while sudden reactions still stand out.
 PRD ref: `prd.md > Features and Behavior > Calibration`, `> Automatic bookmarks`.
 
 ### Loudness meter

@@ -62,6 +62,18 @@ describe("Scorer", () => {
     expect(back.d).toBeLessThan(spike.d);
   });
 
+  it("adopts minutes of concentrated frowning as the new normal, but still catches a sharp frown", () => {
+    const sc = new Scorer(base);
+    const concentrating = { ...neutral, browDownLeft: 0.3, browDownRight: 0.3 };
+    const first = sc.push({ ...rawSignals(concentrating), loud: 0.01 });
+    expect(first.f).toBeGreaterThan(2.5);
+    let last = first;
+    for (let i = 0; i < 15 * 90; i++) last = sc.push({ ...rawSignals(concentrating), loud: 0.01 });
+    expect(last.f).toBeLessThan(2.5);
+    for (let i = 0; i < 10; i++) last = sc.push({ ...rawSignals(frowning), loud: 0.01 });
+    expect(last.f).toBeGreaterThan(5);
+  });
+
   it("marks a loud groan", () => {
     const sc = new Scorer(base);
     expect(sc.push({ ...rawSignals(neutral), loud: 0.3 }).loud).toBeGreaterThan(5);
