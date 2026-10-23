@@ -19,7 +19,7 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 6. The dev clicks **Stop** (or stops sharing the window). Flinch saves the session and opens **Review**.
 7. **Review.** The recording plays at the top; the full reaction timeline sits under it with pins on the biggest spikes. A list of moments sits on the right: type, timecode, a thumbnail, how strong it was.
 8. Clicking a pin or a list row jumps the video to just before the moment and plays it. The dev types a note on the moment or dismisses it if it was wrong (a sneeze, a phone notification).
-9. **Export.** **Download notes** saves a Markdown file of the kept moments with timecodes and notes. **Make highlight reel** plays each kept moment into a short video with a label card, then downloads it. **Download full recording** saves the whole session.
+9. **Export.** **Download notes** saves a Markdown file of the kept moments with timecodes and notes. **Make highlight reel** plays each kept moment into a short video with a label card, then downloads it. **Download recording** saves the whole session (game and face files).
 10. Success: the dev knows which three moments to fix, without rewatching the whole session.
 
 ## Screens and Layout
@@ -37,7 +37,8 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 ### Capture
 - As a solo dev, I want to record the game and my tester's face together so that I can see what they saw and how they reacted.
   - [ ] Choosing a window shows its live preview; turning on the camera shows the face preview.
-  - [ ] The recording is one video with the face in a corner of the game, plus microphone sound and the game's sound if the browser provides it.
+  - [ ] Review plays the game with the tester's face in a corner, in sync, with the microphone sound and the game's sound if the browser provides it.
+  - [ ] Recording keeps going while the game window covers Flinch.
   - [ ] If the tester stops sharing the window from Chrome's bar, the recording stops and is saved, not lost.
 
 ### Calibration
@@ -67,7 +68,7 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 - As a dev, I want to take the moments with me so that I can fix them and show them.
   - [ ] Download notes gives a Markdown file: session title, tester, build, date, then each kept moment with timecode, type, strength and note.
   - [ ] Make highlight reel produces a WebM of each kept moment (about 3 s before to 3 s after) with a label card ("0:42 · Frustration"), in timeline order.
-  - [ ] Download full recording gives the whole session as WebM.
+  - [ ] Download recording gives the whole session as two WebM files (game, face).
 
 ### Saved sessions
 - As a dev, I want past playtests to stay on my laptop so that a refresh or a crash doesn't lose a test.

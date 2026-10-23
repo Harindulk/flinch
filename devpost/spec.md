@@ -11,8 +11,8 @@ status: draft
 Flinch is a web page with no server behind it. Everything happens inside Chrome on the dev's laptop.
 
 - **Two inputs.** Chrome's screen-share picker gives a live video of the game window. The webcam and microphone give the tester's face and voice.
-- **The mixer.** Many times a second, the page paints the game onto a hidden drawing surface (a canvas) and paints the face in a rounded corner on top. Chrome's built-in recorder (MediaRecorder) turns that canvas plus the sound into one video file.
-- **The face reader.** Google's MediaPipe Face Landmarker runs on the camera video about 15 times a second. For each frame it returns 52 numbers between 0 and 1 ("blendshapes"), such as how much the brows are pulled down or how much the mouth is smiling.
+- **The recorders.** Chrome's built-in recorder (MediaRecorder) records two files at the same moment: the game window with its sound, and the face with the microphone. They are recorded natively rather than painted by the page, because Chrome slows down a tab that sits behind the game window, and a page-painted video would freeze. Review and the highlight reel play the two together, with the face in a rounded corner.
+- **The face reader.** Google's MediaPipe Face Landmarker runs in a background worker (a helper that Chrome doesn't slow down) on the camera frames, about 15 times a second. For each frame it returns 52 numbers between 0 and 1 ("blendshapes"), such as how much the brows are pulled down or how much the mouth is smiling.
 - **The signal maker.** A small piece of our own code mixes those numbers into two scores: frustration (brows down, frown, pressed lips, nose wrinkle, squint) and delight (smile, raised cheeks). During the ten-second calibration it learns this tester's resting level for each score. After that it reports how far above their own resting face they are, so a naturally frowny face doesn't count as frustrated.
 - **The moment finder.** After Stop, it looks for the places where a score stayed clearly above rest for at least half a second. A loud sound from the tester at the same time makes the moment stronger. It merges moments closer than five seconds and keeps the strongest twelve.
 - **The shelf.** The browser's built-in database (IndexedDB) keeps each session: the video, the score samples, the moments, notes and thumbnails. It stays on this laptop.
@@ -25,10 +25,10 @@ PRD ref: `prd.md > The Core Journey`.
 1. Home → `store.listSessions()` reads IndexedDB and renders the list.
 2. Setup → `capture.pickWindow()` calls `getDisplayMedia`; `capture.openCamera()` calls `getUserMedia({video, audio})`. Previews are `<video>` tags. The consent box and both sources enable Calibrate.
 3. Calibrate → `face.start()` loads the model from `/models` and the wasm from `/wasm`, reads the camera at about 15 fps; `signals.calibrate()` collects ten seconds of frames and returns a per-signal mean and spread. Fewer than 40% of frames with a face → retry message.
-4. Record → `compositor` paints game plus face to a 1280×720 canvas; `recorder` records the canvas stream plus mixed audio (mic + game audio) in one-second chunks; each face frame becomes a sample `{t, frustration, delight, loud, face}` with `t` in seconds from record start. Every second a 160×90 JPEG thumbnail of the canvas is kept. The live strip draws the last 30 s of samples. M adds a manual mark.
-5. Stop (button, or the shared window's track ending) → chunks become one Blob; `moments.find(samples, marks)` returns the pins; `store.saveSession()` writes everything; the router opens Review.
-6. Review → the video plays from an object URL of the stored Blob; `timeline` draws the lines and pins; clicking a pin seeks to `t − 3`. Notes and dismissals call `store.updateMoment()`.
-7. Export → `exportNotes()` builds Markdown and downloads it; `makeReel()` plays each kept moment into a canvas recorder with a 1-second title card; full recording downloads the stored Blob.
+4. Record → `recorder` starts two MediaRecorders (game video + game audio; camera + mic) in one-second chunks; the face worker reads camera frames and mic audio through `MediaStreamTrackProcessor` and posts blendshapes and loudness with absolute timestamps; each face frame becomes a sample `{t, f, d, loud, face}` with `t` in seconds from record start. The live strip draws the last 30 s of samples. M adds a manual mark.
+5. Stop (button, or the shared window's track ending) → chunks become two Blobs; `moments.find(samples, marks)` returns the pins; a thumbnail is grabbed for each moment by seeking the two videos; `store.saveSession()` writes everything; the router opens Review.
+6. Review → the game video plays from an object URL with the face video kept in sync in a corner; `timeline` draws the lines and pins; clicking a pin seeks to `t − 3`. Notes and dismissals call `store.updateMoment()`.
+7. Export → `notesMarkdown()` builds Markdown and downloads it; `makeReel()` plays each kept moment (game + face corner) into a canvas recorder with a 1-second title card; Download recording saves the two stored files.
 
 ## Stack
 - **TypeScript 5.9 + Vite 8**, no UI framework. A few screens and one data shape don't need React; plain DOM keeps the build and the code tour small. Docs: https://vite.dev/guide/
@@ -60,12 +60,12 @@ PRD ref: `prd.md > Screens and Layout`.
 `src/capture.ts`: opens the window share and the camera+mic, reports clear errors (denied, no device, unsupported), and notices when sharing ends.
 PRD ref: `prd.md > Features and Behavior > Capture`, `prd.md > States and Boundaries`.
 
-### Compositor and recorder
-`src/recorder.ts`: draws the game (letterboxed) and the face corner onto a 1280×720 canvas at 30 fps, mixes mic and game audio, records with MediaRecorder in one-second chunks, and takes a thumbnail each second.
+### Recorder
+`src/recorder.ts`: starts and stops the two MediaRecorders together (game: display video + display audio; face: camera + mic) and reports elapsed time. `src/thumbs.ts` grabs a game-plus-face thumbnail at a given time by seeking the recordings.
 PRD ref: `prd.md > Features and Behavior > Capture`.
 
 ### Face reader
-`src/face.ts`: loads the Face Landmarker once and calls a callback with the blendshape scores (or "no face") for each processed camera frame, about 15 per second.
+`src/face.ts` + `src/face.worker.ts`: the worker loads the Face Landmarker and reads camera frames and mic audio from `MediaStreamTrackProcessor` streams; it posts the blendshape scores (or "no face") about 15 times a second and the mic loudness about 15 times a second.
 PRD ref: `prd.md > Features and Behavior > Calibration`, `> Live reaction line`.
 
 ### Signal maker
@@ -73,7 +73,7 @@ PRD ref: `prd.md > Features and Behavior > Calibration`, `> Live reaction line`.
 PRD ref: `prd.md > Features and Behavior > Calibration`, `> Automatic bookmarks`.
 
 ### Loudness meter
-Inside `src/recorder.ts`: an AnalyserNode on the mic gives a loudness value per face frame; calibration also learns resting loudness. "Loud" means well above that.
+Inside `src/face.worker.ts`: the root-mean-square level of each mic audio chunk; calibration also learns resting loudness. "Loud" means well above that.
 PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`.
 
 ### Moment finder
@@ -102,12 +102,12 @@ type Sample = { t: number; f: number; d: number; loud: number; face: boolean }; 
 type Moment = { id: string; t: number; kind: "frustration" | "delight" | "mark";
                 strength: number; thumb?: string; note: string; dismissed: boolean };
 type Session = { id: string; tester: string; build: string; createdAt: number; duration: number;
-                 mimeType: string; samples: Sample[]; moments: Moment[]; thumbs: string[] /* one per second */ };
+                 mimeType: string; samples: Sample[]; moments: Moment[] };
 ```
-- Lives in IndexedDB (`flinch` database): `sessions` keyed by `id`, `videos` keyed by the same `id` holding the Blob.
+- Lives in IndexedDB (`flinch` database): `sessions` keyed by `id`, `videos` keyed by the same `id` holding `{ game: Blob, face: Blob }`.
 - Written once at Stop; notes and dismissals update the session record immediately.
 - Leaving and coming back: Home lists sessions; `#/review/<id>` reopens one. Deleting removes both records.
-- Size: a 3-minute session is about 15–40 MB of video plus under 1 MB of samples and thumbnails.
+- Size: a 3-minute session is about 15–40 MB of video plus under 1 MB of samples and moment thumbnails.
 
 ## File Structure
 ```
@@ -116,8 +116,10 @@ flinch/
 ├── src/
 │   ├── main.ts             # router + screen switching
 │   ├── capture.ts          # window share, camera + mic, error messages
-│   ├── recorder.ts         # compositor canvas, audio mix, loudness, MediaRecorder, thumbnails
-│   ├── face.ts             # MediaPipe Face Landmarker wrapper
+│   ├── recorder.ts         # the two MediaRecorders
+│   ├── thumbs.ts           # moment thumbnails from the recordings
+│   ├── face.ts             # starts the face worker, passes it camera + mic frames
+│   ├── face.worker.ts      # MediaPipe Face Landmarker + mic loudness, off the main thread
 │   ├── signals.ts          # blendshapes → frustration/delight, calibration, scoring (pure)
 │   ├── moments.ts          # moment finder (pure)
 │   ├── timeline.ts         # live strip + review timeline drawing
@@ -148,6 +150,7 @@ None at runtime. No API, no key, no network call after the page loads. `npm inst
 ## What Was Simplified and Why
 - **Plain DOM** instead of React — four screens don't need a framework, and the code tour stays readable.
 - **Two hand-tuned formulas over blendshapes** instead of a trained emotion model — explainable, needs no data, and calibration does the per-person work. A trained classifier would need labelled playtest footage.
+- **Two recordings composited on playback** instead of one baked-in video — the only way to keep recording while Flinch is behind the game. Download recording therefore gives two files (game, face).
 - **The reel is recorded in real time** (a 4-moment reel takes about 30 s) instead of cutting the WebM file — browsers can't cut WebM without a big library like ffmpeg.wasm.
 - **One tester per session** — merging testers needs session alignment by game events, which is deferred.
 

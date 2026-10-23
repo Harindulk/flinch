@@ -11,22 +11,22 @@ Build mode: fast (Harindu asked for autonomous overnight work)
 
 ## Slices
 
-- [ ] **1. You can record a playtest and watch it back**
+- [x] **1. You can record a playtest and watch it back**
   Becomes usable: Open Flinch, pick a window, turn on the camera, start, stop, and watch one video with the game and the face in a corner.
   Why now: Proves the whole capture path (the part most likely to break) end to end, with the project scaffold included.
   PRD ref: `prd.md > The Core Journey` (steps 1–3, 5–7), `prd.md > Features and Behavior > Capture`
-  Spec ref: `spec.md > Capture`, `spec.md > Compositor and recorder`, `spec.md > App shell and router`, `spec.md > File Structure`
-  Build: Scaffold index.html, styles, router; Setup screen with consent, window and camera tiles; compositor canvas + audio mix + MediaRecorder; Record screen with timer and Stop; a basic Review that plays the recorded Blob.
+  Spec ref: `spec.md > Capture`, `spec.md > Recorder`, `spec.md > App shell and router`, `spec.md > File Structure`
+  Build: Scaffold index.html, styles, router; Setup screen with consent, window and camera tiles; the two MediaRecorders; Record screen with timer and Stop; a basic Review that plays the game recording with the face recording in sync in a corner.
   Verify (mechanical): `npm run build` passes; `npm run e2e` with a fake camera and screen records for a few seconds and the Review video has a duration above 0.
   Learner check: Record yourself for 20 seconds with any window and play it back. Is the face corner the right size and place?
-  Commit: `Record game window and webcam into one video`
+  Commit: `Record the game window and webcam and play them back together`
 
 - [ ] **2. Flinch learns your resting face and shows a live reaction line**
   Becomes usable: A ten-second calibration, then a live frustration/delight line under the recording that moves with your face.
   Why now: This is the kernel; everything after it depends on the scores being right.
   PRD ref: `prd.md > Features and Behavior > Calibration`, `prd.md > Features and Behavior > Live reaction line`
   Spec ref: `spec.md > Face reader`, `spec.md > Signal maker`, `spec.md > Loudness meter`, `spec.md > Live strip and review timeline`
-  Build: face.ts wrapper, signals.ts (raw signals, calibrate, score) with unit tests, calibration overlay with face-found indicator and retry, loudness meter, live strip on the Record screen with face-lost gaps.
+  Build: face.ts + face.worker.ts, signals.ts (raw signals, calibrate, score) with unit tests, calibration overlay with face-found indicator and retry, loudness meter, live strip on the Record screen with face-lost gaps.
   Verify (mechanical): `npm test` passes the signals tests; `npm run e2e` shows the calibration finding a face in the fake camera and samples being collected.
   Learner check: Calibrate, then smile and frown at the camera. Do the green and red lines move the way you expect?
   Commit: `Calibrate to the tester and draw a live reaction line`
@@ -36,7 +36,7 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Why now: Completes the kernel: the dev no longer has to scrub the whole video.
   PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`, `prd.md > Features and Behavior > Review and notes`
   Spec ref: `spec.md > Moment finder`, `spec.md > Live strip and review timeline`
-  Build: moments.ts with unit tests, manual marks (M key and button), thumbnails each second, Review timeline with pins, playhead and click-to-seek, moments list with note field and dismiss.
+  Build: moments.ts with unit tests, manual marks (M key and button), thumbs.ts moment thumbnails, Review timeline with pins, playhead and click-to-seek, moments list with note field and dismiss.
   Verify (mechanical): `npm test` passes the moments tests; `npm run e2e` presses M during recording and finds an amber pin on Review.
   Learner check: Record 30 seconds, smile hard once and frown once, press M once. Do three pins land in the right places?
   Commit: `Find reaction moments and pin them on the review timeline`
@@ -52,14 +52,14 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Commit: `Save playtests and notes in the browser`
 
 - [ ] **5. You can take the moments with you**
-  Becomes usable: Download notes (Markdown), download the full recording, and make a highlight reel of the kept moments.
+  Becomes usable: Download notes (Markdown), download the recording (game and face files), and make a highlight reel of the kept moments.
   Why now: The export is what the dev fixes from and what makes the demo memorable.
   PRD ref: `prd.md > Features and Behavior > Export`
   Spec ref: `spec.md > Export`
   Build: notesMarkdown with unit test, downloads, makeReel with title cards and progress, muted to the speakers.
   Verify (mechanical): `npm test` passes the notes test; `npm run e2e` makes a reel and checks the downloaded file is a WebM with a duration.
   Learner check: Make a reel from a session with three moments and watch it. Do the title cards read well?
-  Commit: `Export notes, full recording and a highlight reel`
+  Commit: `Export notes, recordings and a highlight reel`
 
 - [ ] **6. Every awkward case says something helpful**
   Becomes usable: Clear messages for denied permissions, no camera, unsupported browser, no moments, face lost; first-use Home explains the steps.
@@ -93,3 +93,4 @@ Reflection: not started
 Activity mode: not started
 
 ## Revisions
+- Screen and camera are recorded as two native WebM files and composited at playback and in the reel, instead of painting one canvas from the page — a game window covering the Flinch tab makes Chrome throttle page drawing, which would freeze a page-drawn recording. The face model runs in a worker fed by MediaStreamTrackProcessor for the same reason (probe 24 Oct: 16 fps in a module worker).
