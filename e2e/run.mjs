@@ -51,13 +51,15 @@ const only = process.argv[2];
 const results = [];
 const browsers = [];
 async function launch({ camera = "face", denyCamera = false } = {}) {
-  const args = ["--use-fake-device-for-media-stream", "--auto-select-desktop-capture-source=Entire screen", "--mute-audio"];
-  if (!denyCamera) args.push("--use-fake-ui-for-media-stream");
+  const args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--auto-select-desktop-capture-source=Entire screen", "--mute-audio"];
   if (camera !== "pattern") args.push(`--use-file-for-fake-video-capture=${await fixture(camera)}`);
   const browser = await chromium.launch({ args });
   browsers.push(browser);
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 900 } });
-  if (denyCamera) await context.grantPermissions([], { origin: URL_ });
+  // Headless Chromium can't show a real "Block" choice, so make getUserMedia fail the way a blocked camera does.
+  if (denyCamera) await context.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));
+  });
   const page = await context.newPage();
   page.on("pageerror", (e) => console.log("  [pageerror]", e.message));
   await page.addInitScript(() => addEventListener("unhandledrejection", (e) => console.error("unhandled: " + (e.reason?.stack ?? e.reason))));
@@ -114,6 +116,7 @@ await test("records game and face and plays them back", async () => {
   assert(d.length === 2 && d.every((x) => Number.isFinite(x) && x > 2), `video durations ${d}`);
   const faces = Number(await page.getAttribute("#review", "data-faces"));
   assert(faces > 30, `expected face samples during 4 s of recording, got ${faces}`);
+  assert(await page.isVisible("#no-moments"), "a calm session should say there were no big reactions");
   await page.screenshot({ path: `${OUT}review.png` });
 });
 
@@ -185,6 +188,46 @@ await test("keeps playtests and notes after a refresh, and deletes them", async 
   await page.reload();
   await page.waitForSelector("#new-playtest");
   assert(!(await page.$(".session-row")), "deleted session came back after reload");
+});
+
+await test("explains a blocked camera", async () => {
+  const page = await launch({ denyCamera: true });
+  await page.click("#new-playtest");
+  await page.click("#cam-tile-btn");
+  await page.waitForSelector("#cam-tile.error");
+  const msg = await page.textContent("#cam-tile .tile-msg");
+  assert(/blocked/i.test(msg), `message: ${msg}`);
+  assert(await page.isDisabled("#calibrate"), "Calibrate should stay disabled");
+});
+
+await test("screens (visual check)", async () => {
+  const page = await launch({ camera: "reaction" });
+  await page.screenshot({ path: `${OUT}s1-home-empty.png` });
+  await page.click("#new-playtest");
+  await page.screenshot({ path: `${OUT}s2-setup-empty.png` });
+  await page.click("#game-tile-btn");
+  await page.click("#cam-tile-btn");
+  await page.fill("#tester", "Kasun");
+  await page.fill("#build", "Drive Away 0.9");
+  await page.check("#consent");
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${OUT}s3-setup-ready.png` });
+  await page.click("#calibrate");
+  await page.waitForSelector("#countdown", { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}s4-calibrating.png` });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(6000);
+  await page.screenshot({ path: `${OUT}s5-recording.png` });
+  await page.waitForTimeout(3000);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  await page.click(".moment.delight .kind");
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}s6-review.png` });
+  await page.click("text=← Playtests");
+  await page.waitForSelector(".session-row");
+  await page.screenshot({ path: `${OUT}s7-home-list.png` });
 });
 
 await test("asks to retry calibration when no face is visible", async () => {

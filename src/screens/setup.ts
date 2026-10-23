@@ -15,16 +15,17 @@ export function setupScreen(): Screen {
     const consent = h("input", { type: "checkbox", id: "consent" });
     const start = h("button", { class: "primary big", id: "calibrate", disabled: true }, "Calibrate and start");
 
-    const tile = (id: string, title: string, button: string, muted: boolean) => {
+    const tile = (id: string, title: string, button: string, muted: boolean, hint: string) => {
       const video = h("video", { autoplay: true, muted: true, playsInline: true });
-      const msg = h("p", { class: "tile-msg" });
+      const msg = h("p", { class: "tile-msg" }, hint);
       const btn = h("button", { class: "secondary", id: `${id}-btn` }, button);
       const box = h("section", { class: "tile empty", id }, h("h3", {}, title), h("div", { class: "frame" }, video, msg), btn);
       if (muted) video.muted = true;
-      return { box, video, msg, btn };
+      return { box, video, msg, btn, hint };
     };
-    const gameTile = tile("game-tile", "Game", "Choose game window", true);
-    const camTile = tile("cam-tile", "Tester", "Turn on camera & mic", true);
+    const gameTile = tile("game-tile", "Game", "Choose game window", true,
+      "Open your game first, then pick its window. Tick “Share audio” if Chrome offers it, so the reel has the game's sound.");
+    const camTile = tile("cam-tile", "Tester", "Turn on camera & mic", true, "The tester's face and voice. Sit them facing a light.");
     camTile.video.classList.add("mirror");
 
     const refresh = () => {
@@ -35,7 +36,7 @@ export function setupScreen(): Screen {
       t.video.srcObject = s;
       t.box.classList.toggle("empty", !s);
       t.box.classList.toggle("error", Boolean(err));
-      t.msg.textContent = err ? (err instanceof CaptureError ? err.message : String(err)) : "";
+      t.msg.textContent = err ? (err instanceof CaptureError ? err.message : String(err)) : t.hint;
       refresh();
     };
 

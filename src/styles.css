@@ -102,6 +102,7 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .face-lost { color: var(--mark); font-size: 13px; font-weight: 600; }
 
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 11, 12, 0.82); z-index: 2; text-align: center; }
+.stage:has(.overlay:not([hidden])) video.face { z-index: 3; border-color: var(--joy); }
 .overlay .box { display: grid; gap: 14px; justify-items: center; max-width: 460px; padding: 24px; }
 .overlay .count { font: 600 72px/1 var(--mono); }
 .overlay p { margin: 0; color: var(--muted); }
@@ -115,7 +116,7 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .banner { margin: 12px 16px 0; display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .review-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 0; }
 .viewer { display: grid; align-content: start; gap: 0; border-right: 1px solid var(--line); }
-.viewer .stage { aspect-ratio: 16 / 9; }
+.viewer .stage { height: clamp(260px, calc(100vh - 330px), 62vw); }
 .transport { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--panel); border-top: 1px solid var(--line); }
 .timeline { width: 100%; height: 150px; display: block; cursor: pointer; background: var(--panel); border-top: 1px solid var(--line); }
 .moments { display: grid; align-content: start; gap: 8px; padding: 14px; overflow-y: auto; max-height: calc(100vh - 64px); }
@@ -126,6 +127,7 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .moment img { width: 96px; height: 54px; object-fit: cover; border-radius: 4px; background: #000; }
 .moment .head { display: flex; gap: 8px; align-items: baseline; }
 .moment .kind { color: var(--c); font-weight: 650; font-size: 13px; }
+.moment .x { margin-left: auto; color: var(--muted); font-size: 12px; }
 .moment .strength { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 6px 0; }
 .moment .strength > i { display: block; height: 100%; background: var(--c); }
 .moment textarea { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; min-height: 32px; }
@@ -142,3 +144,5 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 }
 .hint { margin: 0; padding: 8px 16px 16px; color: var(--muted); font-size: 12px; background: var(--panel); }
 .moment .meta { font-size: 12px; margin: 6px 0; }
+.hero-line { width: 100%; max-width: 640px; height: auto; display: block; margin-top: -8px; }
+.hero-line text { font: 12px var(--mono); fill: var(--muted); }

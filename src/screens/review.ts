@@ -67,7 +67,8 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
       const el = h("article", { class: `moment ${m.kind}${m.dismissed ? " dismissed" : ""}`, dataset: { id: m.id, kind: m.kind } },
         m.thumb ? h("img", { src: m.thumb, alt: `Frame at ${timecode(m.t)}` }) : h("img", { alt: "" }),
         h("div", {},
-          h("div", { class: "head" }, h("span", { class: "kind" }, LABEL[m.kind]), h("span", { class: "mono" }, timecode(m.t))),
+          h("div", { class: "head" }, h("span", { class: "kind" }, LABEL[m.kind]), h("span", { class: "mono" }, timecode(m.t)),
+            m.kind === "mark" ? null : h("span", { class: "x mono" }, `${m.strength.toFixed(1)}×`)),
           m.kind === "mark"
             ? h("div", { class: "meta progress" }, "Marked during play")
             : h("div", { class: "strength", title: `${m.strength.toFixed(1)}× above resting face` }, h("i", { style: `width:${Math.min(100, (m.strength / 10) * 100)}%` })),
@@ -166,7 +167,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
         h("header", { class: "bar" },
           h("button", { class: "ghost", onclick: () => show(homeScreen()) }, "← Playtests"),
           h("h2", {}, `${session.tester} · ${session.build}`),
-          h("span", { class: "who mono" }, new Date(session.createdAt).toLocaleString()),
+          h("span", { class: "who" }, new Date(session.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })),
           h("span", { class: "spacer" }),
           progress,
           exports,

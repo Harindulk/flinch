@@ -61,7 +61,7 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Learner check: Make a reel from a session with three moments and watch it. Do the title cards read well?
   Commit: `Export notes, recordings and a highlight reel`
 
-- [ ] **6. Every awkward case says something helpful**
+- [x] **6. Every awkward case says something helpful**
   Becomes usable: Clear messages for denied permissions, no camera, unsupported browser, no moments, face lost; first-use Home explains the steps.
   Why now: Polish after the kernel works; these are the states a judge or a friend hits first.
   PRD ref: `prd.md > States and Boundaries`, `prd.md > Look and Feel`
@@ -98,3 +98,5 @@ Activity mode: not started
 - A big grin now damps the frustration score (`src/signals.ts > rawSignals`) — the reaction test showed a smile also lifting frustration through eye squint and nose wrinkle.
 - The e2e "reaction" camera fixture is spliced from two MediaPipe public test images (a calm face, then a smiling one), downloaded at test time into `e2e/out/` and never committed.
 - The highlight reel records as MP4 (H.264/AAC) when Chrome supports it, WebM otherwise — MediaRecorder WebM files carry no duration, which trips up QuickTime and some upload sites. The e2e run got a 12.4 s MP4 with a real duration.
+- The hidden-tab check moved from `npm run e2e` to Harindu's hands-on check: headless Chromium never marks a tab hidden, so the test couldn't prove anything there. The design (native recorders plus a face worker) doesn't depend on the page's timers; it still needs one real run with the game window covering Flinch.
+- Blocked-camera e2e fakes the browser's "NotAllowedError", because headless Chromium can't show a real Block choice. It surfaced a real gap: Chrome refuses camera and screen on non-secure addresses (a LAN IP over http), which Flinch now explains on Home and Setup.
