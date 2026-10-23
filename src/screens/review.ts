@@ -1,16 +1,17 @@
-import { h } from "../dom";
-import { timecode } from "../format";
+import { download, h } from "../dom";
+import { slug, timecode } from "../format";
 import { THRESHOLD } from "../moments";
 import { show, type Screen } from "../nav";
 import { Player } from "../player";
 import { drawTimeline, timeAt } from "../timeline";
 import type { Moment, Session, Videos } from "../types";
+import { updateSession } from "../store";
 import { homeScreen } from "./home";
 
 const LEAD_IN = 3; // jump to a little before the moment, so you see what led to it
 const LABEL = { frustration: "Frustration", delight: "Delight", mark: "Marked" } as const;
 
-export function reviewScreen(session: Session, videos: Videos): Screen {
+export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?: boolean } = {}): Screen {
   return (root) => {
     const player = new Player(session.duration);
     let selected: string | null = null;
@@ -91,7 +92,22 @@ export function reviewScreen(session: Session, videos: Videos): Screen {
       return el;
     };
 
-    const onChange = (_m: Moment) => {};
+    let saveTimer = 0;
+    const onChange = (_m: Moment) => {
+      clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => updateSession(session).catch(() => {}), 300);
+    };
+    const fileBase = `flinch-${slug(session.tester)}-${slug(session.build)}-${new Date(session.createdAt).toISOString().slice(0, 10)}`;
+    const ext = session.mimeType.includes("mp4") ? "mp4" : "webm";
+    const downloadRecording = () => {
+      download(videos.game, `${fileBase}-game.${ext}`);
+      setTimeout(() => download(videos.face, `${fileBase}-face.${ext}`), 400);
+    };
+    const unsavedBanner = opts.unsaved
+      ? h("div", { class: "notice error banner", id: "unsaved" },
+          "This browser couldn't save the playtest (storage full, or a private window). Download it now so it isn't lost. ",
+          h("button", { class: "danger", onclick: downloadRecording }, "Download recording"))
+      : null;
 
     const renderList = () => {
       const kept = session.moments.filter((m) => m.kind !== "mark");
@@ -125,6 +141,7 @@ export function reviewScreen(session: Session, videos: Videos): Screen {
           h("h2", {}, `${session.tester} · ${session.build}`),
           h("span", { class: "who mono" }, new Date(session.createdAt).toLocaleString()),
         ),
+        unsavedBanner,
         h("div", { class: "review-body" },
           h("section", { class: "viewer" },
             player.el,
@@ -149,6 +166,10 @@ export function reviewScreen(session: Session, videos: Videos): Screen {
     });
 
     return () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        updateSession(session).catch(() => {});
+      }
       cancelAnimationFrame(raf);
       removeEventListener("keydown", onKey);
       removeEventListener("resize", redraw);

@@ -146,6 +146,32 @@ await test("pins a smile and a manual mark, and clicking a pin replays it", asyn
   await page.screenshot({ path: `${OUT}review-reaction.png` });
 });
 
+await test("keeps playtests and notes after a refresh, and deletes them", async () => {
+  const page = await launch({ camera: "reaction" });
+  await startPlaytest(page, { tester: "Nimali", build: "Save test" });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(9000);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  await page.fill(".moment.delight textarea", "Grinned at the drift jump");
+  await page.waitForTimeout(600);
+  assert(page.url().includes("#/review/"), `url ${page.url()}`);
+  await page.reload();
+  await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
+  const note = await page.inputValue(".moment.delight textarea");
+  assert(note === "Grinned at the drift jump", `note after reload: "${note}"`);
+  await page.click("text=← Playtests");
+  await page.waitForSelector(".session-row");
+  const rows = await page.$$eval(".session-row .title", (els) => els.map((e) => e.textContent));
+  assert(rows.length === 1 && rows[0] === "Nimali · Save test", `rows ${rows}`);
+  page.once("dialog", (d) => d.accept());
+  await page.click(".session-row button:has-text('Delete')");
+  await page.waitForFunction(() => !document.querySelector(".session-row"));
+  await page.reload();
+  await page.waitForSelector("#new-playtest");
+  assert(!(await page.$(".session-row")), "deleted session came back after reload");
+});
+
 await test("asks to retry calibration when no face is visible", async () => {
   const page = await launch({ camera: "pattern" });
   await startPlaytest(page);

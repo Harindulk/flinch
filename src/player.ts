@@ -38,17 +38,17 @@ export class Player {
   readonly el = h("div", { class: "stage" }, this.game, this.face);
   private sync = 0;
 
-  constructor(readonly duration: number) {
+  constructor(readonly duration: number) {}
+
+  async load(game: Blob, face: Blob) {
+    await Promise.all([loadVideo(this.game, game), loadVideo(this.face, face)]);
+    // Sync only after both have loaded: loadVideo's seek-to-end on one must not reach the other.
     this.game.onplay = () => this.face.play().catch(() => {});
     this.game.onpause = () => this.face.pause();
     this.game.onseeking = () => (this.face.currentTime = this.game.currentTime);
     this.sync = window.setInterval(() => {
       if (Math.abs(this.face.currentTime - this.game.currentTime) > 0.15) this.face.currentTime = this.game.currentTime;
     }, 500);
-  }
-
-  async load(game: Blob, face: Blob) {
-    await Promise.all([loadVideo(this.game, game), loadVideo(this.face, face)]);
   }
 
   get time() {

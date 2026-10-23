@@ -8,6 +8,7 @@ import { calibrate, rawSignals, Scorer, type Raw } from "../signals";
 import { drawTimeline } from "../timeline";
 import { findMoments, THRESHOLD } from "../moments";
 import { addThumbs } from "../thumbs";
+import { saveSession } from "../store";
 import type { Sample, Session } from "../types";
 import { reviewScreen } from "./review";
 import { setupScreen } from "./setup";
@@ -163,7 +164,9 @@ export function recordScreen(ctx: RecordCtx): Screen {
         samples,
         moments,
       };
-      show(reviewScreen(session, { game: recording.game, face: recording.face }));
+      const videos = { game: recording.game, face: recording.face };
+      const saved = await saveSession(session, videos).then(() => true, () => false);
+      show(reviewScreen(session, videos, { unsaved: !saved }), `#/review/${session.id}`);
     };
     stopBtn.onclick = finish;
     const mark = () => {

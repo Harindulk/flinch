@@ -41,7 +41,7 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Learner check: Record 30 seconds, smile hard once and frown once, press M once. Do three pins land in the right places?
   Commit: `Find reaction moments and pin them on the review timeline`
 
-- [ ] **4. Playtests are kept on the laptop**
+- [x] **4. Playtests are kept on the laptop**
   Becomes usable: Sessions, notes and dismissals survive a refresh; Home lists them; delete works.
   Why now: A lost playtest is the worst failure; this has to land before export builds on it.
   PRD ref: `prd.md > Features and Behavior > Saved sessions`, `prd.md > States and Boundaries`
