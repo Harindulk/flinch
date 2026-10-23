@@ -43,6 +43,7 @@ Playtests are kept in the browser (IndexedDB) until you delete them from the hom
 ```bash
 npm test        # unit tests: signals, moments, notes export
 npm run e2e     # headless Chromium (muted) with a fake camera, mic and screen
+npm run build && E2E_PREVIEW=1 npm run e2e   # the same against the production build
 ```
 
 The end-to-end run downloads two of MediaPipe's public test images into `e2e/out/` and splices them into a fake camera video (a calm face, then a smile), so the whole path from face to pin to reel is exercised without a real webcam.

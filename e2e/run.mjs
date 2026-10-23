@@ -39,7 +39,8 @@ async function fixture(kind = "face") {
   return y4m;
 }
 
-const server = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { stdio: "pipe" });
+// E2E_PREVIEW=1 tests the production build (npm run build first) instead of the dev server.
+const server = spawn("npx", process.env.E2E_PREVIEW ? ["vite", "preview", "--port", String(PORT), "--strictPort"] : ["vite", "--port", String(PORT), "--strictPort"], { stdio: "pipe" });
 const stopServer = () => server.kill();
 process.on("exit", stopServer);
 await new Promise((ok, fail) => {
