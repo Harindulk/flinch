@@ -1,0 +1,9 @@
+/devpost/learner-profile.md
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+public/wasm/
+probe.html
+e2e/out/
