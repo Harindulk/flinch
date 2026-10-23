@@ -1,5 +1,4 @@
-// Chrome's insertable-streams API is missing from TypeScript's DOM lib.
-declare class MediaStreamTrackProcessor<T = VideoFrame | AudioData> {
-  constructor(init: { track: MediaStreamTrack; maxBufferSize?: number });
-  readonly readable: ReadableStream<T>;
+// TypeScript types only the worker form of this constructor; Chrome's window form takes the track.
+interface MediaStreamTrackProcessorInit {
+  track: MediaStreamTrack;
 }

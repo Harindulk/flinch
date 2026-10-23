@@ -21,7 +21,7 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Learner check: Record yourself for 20 seconds with any window and play it back. Is the face corner the right size and place?
   Commit: `Record the game window and webcam and play them back together`
 
-- [ ] **2. Flinch learns your resting face and shows a live reaction line**
+- [x] **2. Flinch learns your resting face and shows a live reaction line**
   Becomes usable: A ten-second calibration, then a live frustration/delight line under the recording that moves with your face.
   Why now: This is the kernel; everything after it depends on the scores being right.
   PRD ref: `prd.md > Features and Behavior > Calibration`, `prd.md > Features and Behavior > Live reaction line`
@@ -31,7 +31,7 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Learner check: Calibrate, then smile and frown at the camera. Do the green and red lines move the way you expect?
   Commit: `Calibrate to the tester and draw a live reaction line`
 
-- [ ] **3. Stop shows pins on the biggest reactions, and clicking one replays it**
+- [x] **3. Stop shows pins on the biggest reactions, and clicking one replays it**
   Becomes usable: After Stop, a timeline under the video with pins and a moments list with thumbnails; clicking jumps to three seconds before.
   Why now: Completes the kernel: the dev no longer has to scrub the whole video.
   PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`, `prd.md > Features and Behavior > Review and notes`
@@ -94,3 +94,6 @@ Activity mode: not started
 
 ## Revisions
 - Screen and camera are recorded as two native WebM files and composited at playback and in the reel, instead of painting one canvas from the page — a game window covering the Flinch tab makes Chrome throttle page drawing, which would freeze a page-drawn recording. The face model runs in a worker fed by MediaStreamTrackProcessor for the same reason (probe 24 Oct: 16 fps in a module worker).
+- Slices 2 and 3 landed in one commit — the record screen's calibration, live line and Mark key were written in one pass, so splitting them would have meant committing a half-wired screen.
+- A big grin now damps the frustration score (`src/signals.ts > rawSignals`) — the reaction test showed a smile also lifting frustration through eye squint and nose wrinkle.
+- The e2e "reaction" camera fixture is spliced from two MediaPipe public test images (a calm face, then a smiling one), downloaded at test time into `e2e/out/` and never committed.

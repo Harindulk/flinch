@@ -1,33 +1,158 @@
 import { h } from "../dom";
 import { timecode } from "../format";
+import { THRESHOLD } from "../moments";
 import { show, type Screen } from "../nav";
 import { Player } from "../player";
-import type { Session, Videos } from "../types";
+import { drawTimeline, timeAt } from "../timeline";
+import type { Moment, Session, Videos } from "../types";
 import { homeScreen } from "./home";
+
+const LEAD_IN = 3; // jump to a little before the moment, so you see what led to it
+const LABEL = { frustration: "Frustration", delight: "Delight", mark: "Marked" } as const;
 
 export function reviewScreen(session: Session, videos: Videos): Screen {
   return (root) => {
     const player = new Player(session.duration);
+    let selected: string | null = null;
+    let raf = 0;
+
     const playBtn = h("button", { class: "secondary", id: "play" }, "Play");
     const clock = h("span", { class: "clock mono", id: "review-clock" }, `0:00 / ${timecode(session.duration)}`);
-    player.game.ontimeupdate = () => (clock.textContent = `${timecode(player.time)} / ${timecode(session.duration)}`);
-    player.game.addEventListener("play", () => (playBtn.textContent = "Pause"));
-    player.game.addEventListener("pause", () => (playBtn.textContent = "Play"));
+    const timeline = h("canvas", { class: "timeline", id: "timeline", title: "Click to jump" });
+    const list = h("section", { class: "moments", id: "moments" });
+
+    const redraw = () => {
+      clock.textContent = `${timecode(player.time)} / ${timecode(session.duration)}`;
+      drawTimeline(timeline, session.samples, { from: 0, to: session.duration, moments: session.moments, playhead: player.time, selected, threshold: THRESHOLD });
+    };
+    const loop = () => {
+      redraw();
+      raf = requestAnimationFrame(loop);
+    };
+    player.game.addEventListener("play", () => {
+      playBtn.textContent = "Pause";
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(loop);
+    });
+    player.game.addEventListener("pause", () => {
+      playBtn.textContent = "Play";
+      cancelAnimationFrame(raf);
+      redraw();
+    });
+    player.game.addEventListener("seeked", redraw);
     playBtn.onclick = () => player.toggle();
 
+    const select = (m: Moment, play = true) => {
+      selected = m.id;
+      player.seek(m.t - LEAD_IN);
+      if (play) player.game.play().catch(() => {});
+      for (const row of list.querySelectorAll<HTMLElement>(".moment")) row.classList.toggle("selected", row.dataset.id === m.id);
+      list.querySelector<HTMLElement>(`[data-id="${m.id}"]`)?.scrollIntoView({ block: "nearest" });
+      redraw();
+    };
+
+    timeline.onclick = (e) => {
+      const t = timeAt(timeline, e.clientX, 0, session.duration);
+      const px = timeline.clientWidth / Math.max(session.duration, 1);
+      const near = session.moments.find((m) => Math.abs(m.t - t) * px < 8);
+      if (near) select(near);
+      else player.seek(t);
+    };
+
+    const row = (m: Moment) => {
+      const note = h("textarea", { placeholder: "What happened here? e.g. jump too far", value: m.note, rows: 1 });
+      const dismiss = h("button", { class: "ghost" }, m.dismissed ? "Restore" : "Not a reaction");
+      const el = h("article", { class: `moment ${m.kind}${m.dismissed ? " dismissed" : ""}`, dataset: { id: m.id, kind: m.kind } },
+        m.thumb ? h("img", { src: m.thumb, alt: `Frame at ${timecode(m.t)}` }) : h("img", { alt: "" }),
+        h("div", {},
+          h("div", { class: "head" }, h("span", { class: "kind" }, LABEL[m.kind]), h("span", { class: "mono" }, timecode(m.t))),
+          m.kind === "mark"
+            ? h("div", { class: "meta progress" }, "Marked during play")
+            : h("div", { class: "strength", title: `${m.strength.toFixed(1)}× above resting face` }, h("i", { style: `width:${Math.min(100, (m.strength / 10) * 100)}%` })),
+        ),
+        note,
+        h("div", { class: "actions" }, dismiss),
+      );
+      el.onclick = (e) => {
+        if (e.target === note || e.target === dismiss) return;
+        select(m);
+      };
+      note.oninput = () => {
+        m.note = note.value;
+        onChange(m);
+      };
+      dismiss.onclick = () => {
+        m.dismissed = !m.dismissed;
+        el.classList.toggle("dismissed", m.dismissed);
+        dismiss.textContent = m.dismissed ? "Restore" : "Not a reaction";
+        onChange(m);
+        redraw();
+      };
+      return el;
+    };
+
+    const onChange = (_m: Moment) => {};
+
+    const renderList = () => {
+      const kept = session.moments.filter((m) => m.kind !== "mark");
+      list.replaceChildren(
+        h("h3", {}, `Moments · ${session.moments.length}`),
+        ...(kept.length ? [] : [h("p", { class: "empty", id: "no-moments" }, "No big reactions this time. Either the game ran smooth, or your tester has a poker face. The timeline below still shows every wobble.")]),
+        ...session.moments.map(row),
+      );
+    };
+    renderList();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+      if (e.key === " ") {
+        e.preventDefault();
+        player.toggle();
+      } else if (e.key === "n" || e.key === "p") {
+        const ms = session.moments;
+        const i = ms.findIndex((m) => m.id === selected);
+        const next = e.key === "n" ? ms[i + 1] ?? ms[0] : ms[i - 1] ?? ms[ms.length - 1];
+        if (next) select(next);
+      }
+    };
+    addEventListener("keydown", onKey);
+    addEventListener("resize", redraw);
+
     root.append(
-      h("main", { class: "review", id: "review" },
+      h("main", { class: "review", id: "review", dataset: { samples: String(session.samples.length), faces: String(session.samples.filter((x) => x.face).length) } },
         h("header", { class: "bar" },
           h("button", { class: "ghost", onclick: () => show(homeScreen()) }, "← Playtests"),
           h("h2", {}, `${session.tester} · ${session.build}`),
+          h("span", { class: "who mono" }, new Date(session.createdAt).toLocaleString()),
         ),
         h("div", { class: "review-body" },
-          h("section", { class: "viewer" }, player.el, h("div", { class: "transport" }, playBtn, clock)),
+          h("section", { class: "viewer" },
+            player.el,
+            h("div", { class: "transport" }, playBtn, clock, h("span", { class: "spacer" }),
+              h("span", { class: "legend" },
+                h("span", {}, h("i", { style: "background:var(--frus)" }), "Frustration"),
+                h("span", {}, h("i", { style: "background:var(--joy)" }), "Delight"),
+                h("span", {}, h("i", { style: "background:var(--mark)" }), "Marked"),
+              ),
+            ),
+            timeline,
+            h("p", { class: "hint" }, "Click a pin or a moment to replay it from 3 seconds before. Space plays and pauses; N and P jump between moments."),
+          ),
+          list,
         ),
       ),
     );
-    player.load(videos.game, videos.face).then(() => root.querySelector("#review")?.setAttribute("data-ready", "1"));
+    redraw();
+    player.load(videos.game, videos.face).then(() => {
+      root.querySelector("#review")?.setAttribute("data-ready", "1");
+      redraw();
+    });
 
-    return () => player.destroy();
+    return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener("keydown", onKey);
+      removeEventListener("resize", redraw);
+      player.destroy();
+    };
   };
 }

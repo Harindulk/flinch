@@ -13,6 +13,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
 body { min-height: 100vh; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -137,3 +138,5 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 @media (max-width: 900px) {
   .tiles, .fields, .review-body { grid-template-columns: 1fr; }
 }
+.hint { margin: 0; padding: 8px 16px 16px; color: var(--muted); font-size: 12px; background: var(--panel); }
+.moment .meta { font-size: 12px; margin: 6px 0; }

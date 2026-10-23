@@ -4,18 +4,22 @@ import { h } from "./dom";
 export function loadVideo(video: HTMLVideoElement, blob: Blob): Promise<void> {
   video.src = URL.createObjectURL(blob);
   return new Promise((resolve) => {
+    let done = false;
     const ready = () => {
+      if (done) return;
+      done = true;
       video.removeEventListener("durationchange", onDuration);
       video.currentTime = 0;
       resolve();
     };
+    setTimeout(ready, 8000); // never leave the screen waiting on a stubborn file
     const onDuration = () => Number.isFinite(video.duration) && ready();
     video.addEventListener("loadedmetadata", () => {
       if (Number.isFinite(video.duration)) return ready();
       video.addEventListener("durationchange", onDuration);
       video.currentTime = 1e9;
     }, { once: true });
-    video.addEventListener("error", () => resolve(), { once: true });
+    video.addEventListener("error", ready, { once: true });
   });
 }
 
@@ -66,6 +70,7 @@ export class Player {
       v.pause();
       URL.revokeObjectURL(v.src);
       v.removeAttribute("src");
+      v.load();
     }
   }
 }
