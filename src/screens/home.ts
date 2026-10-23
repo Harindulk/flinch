@@ -20,12 +20,13 @@ export function homeScreen(): Screen {
     const row = (s: Session) => {
       const moments = s.moments.filter((m) => !m.dismissed).length;
       const del = h("button", { class: "ghost", title: "Delete this playtest" }, "Delete");
+      const cover = s.moments.find((m) => m.thumb && !m.dismissed)?.thumb;
       const el = h("article", { class: "session-row", dataset: { id: s.id } },
+        cover ? h("img", { class: "cover", src: cover, alt: "" }) : h("div", { class: "cover" }),
         h("div", {},
           h("div", { class: "title" }, `${s.tester} · ${s.build}`),
           h("div", { class: "meta" }, `${new Date(s.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · ${timecode(s.duration)} · ${moments} moment${moments === 1 ? "" : "s"}`),
         ),
-        h("span", {}),
         h("button", { class: "secondary", onclick: () => open(s) }, "Open"),
         del,
       );

@@ -41,7 +41,7 @@ PRD ref: `prd.md > The Core Journey`.
 - Desktop Chrome or Edge (Chromium). Needs a webcam. Node 20+ to run the dev server.
 - Start: `npm install`, then `npm run dev`, open http://localhost:5173.
 - Demo recording: open a game in another window (a browser game or a Unity build), run Flinch, pick that window, record a friend for 2–3 minutes, then show Review and the reel. Screen-record Flinch itself with macOS Screenshot (Cmd+Shift+5).
-- Optional deployment: it is a static site, so `npm run build` output (`dist/`) can go on GitHub Pages for a link anyone can open. Screen and camera need HTTPS, which Pages provides. Harindu decides at ship time.
+- Optional deployment: it is a static site, so `npm run build` output (`dist/`) can go on GitHub Pages for a link anyone can open. Screen and camera need HTTPS, which Pages provides. `.github/workflows/pages.yml` is ready for that; it does nothing until the repo is on GitHub with Pages set to "GitHub Actions". Harindu decides at ship time.
 - Tests: `npm test` (unit), `npm run e2e` (headless, muted, fake camera and screen).
 
 ## Look and Feel

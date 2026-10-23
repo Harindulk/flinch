@@ -25,14 +25,23 @@ export async function pickWindow(): Promise<MediaStream> {
   }
 }
 
+const VIDEO = { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" };
+
 export async function openCamera(): Promise<MediaStream> {
   try {
     return await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+      video: VIDEO,
       // Raw-ish voice: noise suppression would flatten the groans and laughs we listen for.
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
   } catch (e) {
+    // No microphone: the face alone still works, just without the loudness boost.
+    if ((e as DOMException)?.name === "NotFoundError")
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video: VIDEO });
+      } catch (e2) {
+        throw explain(e2, "camera");
+      }
     throw explain(e, "camera");
   }
 }

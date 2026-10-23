@@ -15,6 +15,10 @@ npm run dev
 
 Open http://localhost:5173. Camera and screen sharing only work on `localhost` or an `https://` address.
 
+## Optional: a live link
+
+`.github/workflows/pages.yml` builds the static site and publishes it to GitHub Pages on every push to `main`, once Pages is set to "GitHub Actions" in the repository settings. Pages serves over https, so camera and screen sharing work there.
+
 ## Use it
 
 1. Open your game in another window (a browser game, a Unity build, an emulator).
