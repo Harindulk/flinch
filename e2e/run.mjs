@@ -1,7 +1,7 @@
 // Headless end-to-end run: Playwright's own Chromium (muted) with a fake camera, mic and screen.
 // The camera fixture is MediaPipe's public test portrait, downloaded into e2e/out/ (gitignored).
 import { spawn, execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright-core";
 
 const OUT = new URL("./out/", import.meta.url).pathname;
@@ -144,6 +144,21 @@ await test("pins a smile and a manual mark, and clicking a pin replays it", asyn
   const t = await page.$eval(".stage video.game", (v) => v.currentTime);
   assert(t > 0.5, `expected the player to jump to the moment, at ${t}`);
   await page.screenshot({ path: `${OUT}review-reaction.png` });
+
+  const [notes] = await Promise.all([page.waitForEvent("download"), page.click("#download-notes")]);
+  await notes.saveAs(`${OUT}notes.md`);
+  const md = readFileSync(`${OUT}notes.md`, "utf8");
+  assert(md.includes("| Delight |") && md.includes("| Marked |"), `notes file:\n${md}`);
+
+  const [reel] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }), page.click("#make-reel")]);
+  const reelPath = `${OUT}reel.${reel.suggestedFilename().split(".").pop()}`;
+  await reel.saveAs(reelPath);
+  const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-count_frames", "-show_entries", "stream=codec_type,nb_read_frames", "-of", "json", reelPath]));
+  const v = probe.streams.find((x) => x.codec_type === "video");
+  // Intro 1.5 s + two cards of 1 s + two clips of up to 6 s, at up to 30 fps.
+  assert(v && v.nb_read_frames > 100, `reel video frames: ${JSON.stringify(probe.streams)}`);
+  assert(probe.streams.some((x) => x.codec_type === "audio"), "reel has no audio track");
+  execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-ss", "4", "-i", reelPath, "-frames:v", "1", `${OUT}reel-frame.png`]);
 });
 
 await test("keeps playtests and notes after a refresh, and deletes them", async () => {

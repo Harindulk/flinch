@@ -51,7 +51,7 @@ Build mode: fast (Harindu asked for autonomous overnight work)
   Learner check: Record, write a note, refresh the tab. Is everything still there?
   Commit: `Save playtests and notes in the browser`
 
-- [ ] **5. You can take the moments with you**
+- [x] **5. You can take the moments with you**
   Becomes usable: Download notes (Markdown), download the recording (game and face files), and make a highlight reel of the kept moments.
   Why now: The export is what the dev fixes from and what makes the demo memorable.
   PRD ref: `prd.md > Features and Behavior > Export`
@@ -97,3 +97,4 @@ Activity mode: not started
 - Slices 2 and 3 landed in one commit — the record screen's calibration, live line and Mark key were written in one pass, so splitting them would have meant committing a half-wired screen.
 - A big grin now damps the frustration score (`src/signals.ts > rawSignals`) — the reaction test showed a smile also lifting frustration through eye squint and nose wrinkle.
 - The e2e "reaction" camera fixture is spliced from two MediaPipe public test images (a calm face, then a smiling one), downloaded at test time into `e2e/out/` and never committed.
+- The highlight reel records as MP4 (H.264/AAC) when Chrome supports it, WebM otherwise — MediaRecorder WebM files carry no duration, which trips up QuickTime and some upload sites. The e2e run got a 12.4 s MP4 with a real duration.

@@ -6,12 +6,22 @@ const KIND_COLOR = { frustration: "--frus", delight: "--joy", mark: "--mark" } a
 const Y_MAX = 8; // scores above this many spreads draw at the top
 const PAD = { top: 18, bottom: 20, x: 10 };
 
-export type TimelineOpts = { from: number; to: number; moments?: Moment[]; playhead?: number; selected?: string | null; threshold?: number };
+export type TimelineOpts = {
+  from: number;
+  to: number;
+  moments?: Moment[];
+  playhead?: number;
+  selected?: string | null;
+  threshold?: number;
+  /** Fixed size for canvases that aren't on the page (the highlight reel). */
+  width?: number;
+  height?: number;
+};
 
 /** Draws the frustration and delight lines (with gaps where there was no face), pins and a playhead. */
 export function drawTimeline(cv: HTMLCanvasElement, samples: Sample[], o: TimelineOpts) {
-  const dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, hgt = cv.clientHeight;
+  const dpr = o.width ? 1 : window.devicePixelRatio || 1;
+  const w = o.width ?? cv.clientWidth, hgt = o.height ?? cv.clientHeight;
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(hgt * dpr)) {
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(hgt * dpr);
@@ -19,6 +29,10 @@ export function drawTimeline(cv: HTMLCanvasElement, samples: Sample[], o: Timeli
   const g = cv.getContext("2d")!;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, hgt);
+  if (o.width) {
+    g.fillStyle = css("--panel") || "#1a1c20";
+    g.fillRect(0, 0, w, hgt);
+  }
 
   const span = Math.max(o.to - o.from, 0.001);
   const x = (t: number) => PAD.x + ((t - o.from) / span) * (w - 2 * PAD.x);

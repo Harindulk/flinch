@@ -5,6 +5,7 @@ import { show, type Screen } from "../nav";
 import { Player } from "../player";
 import { drawTimeline, timeAt } from "../timeline";
 import type { Moment, Session, Videos } from "../types";
+import { keptMoments, makeReel, notesMarkdown } from "../export";
 import { updateSession } from "../store";
 import { homeScreen } from "./home";
 
@@ -103,6 +104,32 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
       download(videos.game, `${fileBase}-game.${ext}`);
       setTimeout(() => download(videos.face, `${fileBase}-face.${ext}`), 400);
     };
+    const progress = h("span", { class: "progress", id: "reel-progress" });
+    const reelBtn = h("button", { class: "primary", id: "make-reel" }, "Make highlight reel");
+    reelBtn.onclick = async () => {
+      if (!keptMoments(session).length) {
+        progress.textContent = "No moments to put in a reel. Mark one, or restore a dismissed one.";
+        return;
+      }
+      reelBtn.disabled = true;
+      player.game.pause();
+      try {
+        const reel = await makeReel(session, videos, (done, total) => {
+          progress.textContent = done < total ? `Recording the reel… moment ${done + 1} of ${total}. Keep this tab open.` : "Finishing…";
+        });
+        download(reel, `${fileBase}-reel.${reel.type.includes("mp4") ? "mp4" : "webm"}`);
+        progress.textContent = "Reel downloaded.";
+      } catch (e) {
+        progress.textContent = `The reel failed: ${(e as Error).message}`;
+      } finally {
+        reelBtn.disabled = false;
+      }
+    };
+    const exports = h("div", { class: "exports" },
+      h("button", { class: "secondary", id: "download-notes", onclick: () => download(new Blob([notesMarkdown(session)], { type: "text/markdown" }), `${fileBase}-notes.md`) }, "Download notes"),
+      h("button", { class: "secondary", id: "download-recording", onclick: downloadRecording }, "Download recording"),
+      reelBtn,
+    );
     const unsavedBanner = opts.unsaved
       ? h("div", { class: "notice error banner", id: "unsaved" },
           "This browser couldn't save the playtest (storage full, or a private window). Download it now so it isn't lost. ",
@@ -140,6 +167,9 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
           h("button", { class: "ghost", onclick: () => show(homeScreen()) }, "← Playtests"),
           h("h2", {}, `${session.tester} · ${session.build}`),
           h("span", { class: "who mono" }, new Date(session.createdAt).toLocaleString()),
+          h("span", { class: "spacer" }),
+          progress,
+          exports,
         ),
         unsavedBanner,
         h("div", { class: "review-body" },
