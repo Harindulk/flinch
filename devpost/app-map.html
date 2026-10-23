@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flinch App Map</title>
+<style>
+  :root { --bg: #111214; --panel: #1a1c20; --line: #2a2d33; --text: #ecebe6; --muted: #8d8f96; --frus: #ff5d5d; --joy: #b8f35a; --mark: #ffb547; color-scheme: dark; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #f6f5f1; --panel: #ffffff; --line: #dcdad4; --text: #1b1c1e; --muted: #62646b; --frus: #d93636; --joy: #4f8a10; --mark: #b8740c; color-scheme: light; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 34px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 18px; margin: 36px 0 10px; }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); }
+  code { font: 13px ui-monospace, "SF Mono", Menlo, monospace; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 10px 0; }
+  .stop { border-left: 3px solid var(--joy); }
+  .stop h3 { margin: 0 0 4px; font-size: 15px; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font: 12px system-ui, sans-serif; fill: var(--text); }
+  svg .small { font-size: 11px; fill: var(--muted); }
+  svg .box { fill: var(--panel); stroke: var(--line); }
+  svg .arrow { stroke: var(--muted); fill: none; marker-end: url(#a); }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Flinch: app map</h1>
+  <p class="muted">A snapshot of how the code fits together, from commit <code>939f038</code> (24 Oct 2026). It can drift as the code changes.</p>
+
+  <h2>What it is, in one breath</h2>
+  <p>A single web page with no server. Chrome records the game window and the webcam as two files. A background worker reads the tester's face about 15 times a second. Our code turns those readings into a frustration score and a delight score, measured against the tester's own resting face. After Stop, it pins the biggest reactions so you can replay them.</p>
+
+  <h2>One action, followed through the code</h2>
+  <p>The tester grins at a jump; a green pin appears on Review.</p>
+  <svg viewBox="0 0 820 230" role="img" aria-label="Diagram: camera frame to face worker to signals to moment finder to review pin">
+    <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="currentColor" style="color: var(--muted)"/></marker></defs>
+    <rect class="box" x="10" y="20" width="140" height="70" rx="8"/><text x="24" y="48">Camera frame</text><text class="small" x="24" y="68">getUserMedia</text>
+    <rect class="box" x="180" y="20" width="160" height="70" rx="8"/><text x="194" y="48">Face worker</text><text class="small" x="194" y="68">face.worker.ts</text>
+    <rect class="box" x="370" y="20" width="160" height="70" rx="8"/><text x="384" y="48">Delight score</text><text class="small" x="384" y="68">signals.ts › Scorer</text>
+    <rect class="box" x="560" y="20" width="160" height="70" rx="8"/><text x="574" y="48">Sample list</text><text class="small" x="574" y="68">record.ts › onFace</text>
+    <rect class="box" x="560" y="140" width="160" height="70" rx="8"/><text x="574" y="168">Moment finder</text><text class="small" x="574" y="188">moments.ts › findMoments</text>
+    <rect class="box" x="300" y="140" width="190" height="70" rx="8"/><text x="314" y="168">Green pin on Review</text><text class="small" x="314" y="188">review.ts › select · timeline.ts</text>
+    <path class="arrow" d="M150 55 H176"/><path class="arrow" d="M340 55 H366"/><path class="arrow" d="M530 55 H556"/>
+    <path class="arrow" d="M640 90 V136"/><path class="arrow" d="M560 175 H494"/>
+    <text class="small" x="652" y="118">after Stop</text>
+  </svg>
+
+  <div class="card stop"><h3>1. The face is read</h3>
+    <p><code>src/face.worker.ts</code>, the <code>self.onmessage</code> handler: MediaPipe's Face Landmarker turns each camera frame into blendshape scores (such as <code>mouthSmileLeft</code>) and posts them back. <code>src/face.ts › FaceReader.start</code> hands the camera to the worker.</p></div>
+  <div class="card stop"><h3>2. Scores against this tester's resting face</h3>
+    <p><code>src/signals.ts › rawSignals</code> mixes the blendshapes into frustration and delight. <code>Scorer.push</code> says how many "spreads" above rest they are. The rest level comes from the ten-second calibration (<code>calibrate</code>) and drifts slowly during play. Each result becomes a sample in <code>src/screens/record.ts › onFace</code>.</p></div>
+  <div class="card stop"><h3>3. Pinned and replayed</h3>
+    <p>On Stop, <code>record.ts › finish</code> calls <code>src/moments.ts › findMoments</code>, which keeps runs at least 2.5 spreads above rest for half a second or more. <code>src/screens/review.ts › select</code> jumps the player to three seconds before the pin.</p></div>
+
+  <h2>To change this, start here</h2>
+  <ul>
+    <li><b>Too many or too few pins:</b> <code>THRESHOLD</code>, <code>MIN_SECONDS</code>, <code>MERGE_SECONDS</code> at the top of <code>src/moments.ts</code>; the tests in <code>test/moments.test.ts</code> show what each does.</li>
+    <li><b>What counts as frustration or delight:</b> the weights in <code>src/signals.ts › rawSignals</code>.</li>
+    <li><b>Calibration length:</b> <code>CALIBRATION_SECONDS</code> in <code>src/screens/record.ts</code>.</li>
+    <li><b>Reel clip length and title cards:</b> <code>REEL_BEFORE</code>, <code>REEL_AFTER</code> and <code>card()</code> in <code>src/export.ts</code>.</li>
+    <li><b>Colours and type:</b> the variables at the top of <code>src/styles.css</code>.</li>
+  </ul>
+
+  <h2>A practice to reuse</h2>
+  <details open><summary>Test the riskiest piece first, with a throwaway probe</summary>
+    <p>Before the spec was written, a ten-minute probe ran the face model, a fake screen share and a recorder in headless Chromium. A second probe moved the model into a worker. That changed the design (<code>devpost/checklist.md › Revisions</code>, first bullet): native recorders plus a worker, because a page that draws its own video freezes when the game window covers it. On the next project, write the smallest script that proves the unfamiliar API does what the plan assumes, before planning around it.</p>
+  </details>
+
+  <h2>Run it again</h2>
+  <p><code>npm install</code>, then <code>npm run dev</code>, and open <code>http://localhost:5173</code> in Chrome. Tests: <code>npm test</code> and <code>npm run e2e</code>.</p>
+</main>
+</body>
+</html>

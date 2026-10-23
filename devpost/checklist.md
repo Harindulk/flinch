@@ -86,8 +86,8 @@ Build mode: fast (Harindu asked for autonomous overnight work)
 - [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
 - [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: not started
-Route and stops: not started
+Activity and evidence: not started — waits for Harindu. `devpost/app-map.html` was generated from commit 939f038 and checked in a headless render; not shown to Harindu yet.
+Route and stops: reference route only (not toured): `src/face.worker.ts` → `src/signals.ts > Scorer` → `src/screens/record.ts > onFace` → `src/moments.ts > findMoments` → `src/screens/review.ts > select`
 Edit outcome: not started
 Reflection: not started
 Activity mode: not started
