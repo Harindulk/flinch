@@ -5,7 +5,8 @@ import { timecode, uid } from "../format";
 import { icon } from "../icons";
 import { SIGNAL_LABEL } from "../labels";
 import { show, type Screen } from "../nav";
-import { SessionRecorder } from "../recorder";
+import { SessionRecorder, type Recording } from "../recorder";
+import { download } from "../dom";
 import { calibrate, rawSignals, Scorer, type Raw } from "../signals";
 import { drawTimeline } from "../timeline";
 import { findMoments, THRESHOLD } from "../moments";
@@ -162,7 +163,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
     const startRecording = () => {
       scorer = new Scorer(calibrate(calib));
       rec = new SessionRecorder(ctx.game, ctx.cam);
-      rec.onError = () => finish();
+      rec.onError = () => void finish();
       rec.start();
       phase = "recording";
       overlay.hidden = true;
@@ -206,7 +207,23 @@ export function recordScreen(ctx: RecordCtx): Screen {
       say(h("h2", {}, "Wrapping up"), h("ol", { class: "steps-done" }, ...steps));
       const done = (i: number) => steps[i].classList.replace("pending", "done");
       reader?.stop();
-      const recording = await rec.stop();
+      try {
+        await wrapUp(done);
+      } catch (e) {
+        // Never leave the tester staring at "Saving…": say what failed and keep the recording reachable.
+        phase = "done";
+        stopStream(ctx.game);
+        stopStream(ctx.cam);
+        status.textContent = "Couldn't finish";
+        say(icon("alert", "big warn"), h("h2", {}, "Something went wrong saving this playtest"), h("p", { id: "finish-error" }, (e as Error)?.message ?? String(e)),
+          lastRecording ? h("button", { class: "primary", onclick: () => lastRecording && downloadRaw(lastRecording) }, icon("download"), "Download the recording") : null,
+          h("button", { class: "ghost", onclick: () => show(setupScreen()) }, "Start again"));
+      }
+    };
+    let lastRecording: Recording | null = null;
+    const wrapUp = async (done: (i: number) => void) => {
+      const recording = await rec!.stop();
+      lastRecording = recording;
       stopStream(ctx.game);
       stopStream(ctx.cam);
       done(0);
@@ -229,7 +246,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
       phase = "done";
       show(reviewScreen(session, videos, { unsaved: !saved, fresh: true }), `#/review/${session.id}`);
     };
-    stopBtn.onclick = finish;
+    stopBtn.onclick = () => void finish();
     const mark = () => {
       if (phase !== "recording" || !rec) return;
       marks.push(rec.elapsed());
@@ -248,8 +265,8 @@ export function recordScreen(ctx: RecordCtx): Screen {
     };
     addEventListener("beforeunload", onUnload);
     // Stopping the share from Chrome's own bar, or a camera being unplugged, ends the session instead of losing it.
-    ctx.game.getVideoTracks()[0]?.addEventListener("ended", finish);
-    ctx.cam.getVideoTracks()[0]?.addEventListener("ended", finish);
+    ctx.game.getVideoTracks()[0]?.addEventListener("ended", () => void finish());
+    ctx.cam.getVideoTracks()[0]?.addEventListener("ended", () => void finish());
 
     const startReader = () => {
       phase = "loading";
@@ -268,12 +285,12 @@ export function recordScreen(ctx: RecordCtx): Screen {
           };
           if (phase === "loading") calibrateNow();
         },
-        (err) => {
+        (err: unknown) => {
           status.textContent = "Face reader failed";
           say(
             icon("alert", "big warn"),
             h("h2", {}, "The face reader couldn't start"),
-            h("p", { id: "face-error" }, `Flinch loads its face model from this site. Check the page is still being served, then try again. (${String(err?.message ?? err).slice(0, 160)})`),
+            h("p", { id: "face-error" }, `Flinch loads its face model from this site. Check the page is still being served, then try again. (${(err instanceof Error ? err.message : "unknown error").slice(0, 160)})`),
             h("div", { class: "row" },
               h("button", { class: "primary", id: "retry-reader", onclick: startReader }, "Try again"),
               h("button", { class: "ghost", onclick: () => show(setupScreen()) }, "Back to setup"),
@@ -299,3 +316,9 @@ export function recordScreen(ctx: RecordCtx): Screen {
 }
 
 const round = (v: number) => Math.round(v * 100) / 100;
+
+function downloadRaw(r: Recording) {
+  const ext = r.mimeType.includes("mp4") ? "mp4" : "webm";
+  download(r.game, `flinch-recording-game.${ext}`);
+  setTimeout(() => download(r.face, `flinch-recording-face.${ext}`), 400);
+}

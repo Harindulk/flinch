@@ -13,7 +13,7 @@ function open(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => {
       db = null;
-      reject(req.error);
+      reject(req.error ?? new Error("Couldn't open browser storage"));
     };
   });
   return db;
@@ -47,8 +47,8 @@ export async function listSessions(): Promise<Session[]> {
 export async function getSession(id: string): Promise<{ session: Session; videos: Videos } | null> {
   let s!: IDBRequest<Session | undefined>, v!: IDBRequest<Videos | undefined>;
   await run(["sessions", "videos"], "readonly", (t) => {
-    s = t.objectStore("sessions").get(id);
-    v = t.objectStore("videos").get(id);
+    s = t.objectStore("sessions").get(id) as IDBRequest<Session | undefined>;
+    v = t.objectStore("videos").get(id) as IDBRequest<Videos | undefined>;
   });
   return s.result && v.result ? { session: s.result, videos: v.result } : null;
 }

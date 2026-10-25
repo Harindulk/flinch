@@ -46,7 +46,7 @@ export function setupScreen(): Screen {
       t.box.classList.toggle("empty", !s);
       t.box.classList.toggle("error", Boolean(err));
       t.box.classList.toggle("ok", Boolean(s));
-      t.msg.textContent = err ? (err instanceof CaptureError ? err.message : String(err)) : t.hint;
+      t.msg.textContent = err ? (err instanceof CaptureError || err instanceof Error ? err.message : "Something went wrong opening it. Try again.") : t.hint;
       done(t, Boolean(s));
       refresh();
     };

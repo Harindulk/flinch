@@ -265,7 +265,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
       ),
     );
     redraw();
-    player.load(videos.game, videos.face).then(() => {
+    void player.load(videos.game, videos.face).then(() => {
       root.querySelector("#review")?.setAttribute("data-ready", "1");
       // Open on the strongest reaction, paused just before it, so the first thing on screen is the moment that matters.
       if (strongest) select(strongest, false);

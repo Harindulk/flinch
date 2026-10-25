@@ -33,6 +33,23 @@ async function fixture(kind = "face") {
     return y4m;
   }
   const calm = await asset("business-person.png");
+  if (kind === "dim") {
+    // The reaction video at about a third of the light, with less contrast: a dim room.
+    const src = await fixture("reaction");
+    execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-i", src, "-vf", "eq=brightness=-0.3:contrast=0.55,noise=alls=12:allf=t", "-pix_fmt", "yuv420p", y4m]);
+    return y4m;
+  }
+  if (kind === "blips") {
+    // Calm for calibration, then four 0.2 s smiles 3 s apart: twitches, not reactions.
+    const parts = [["calm", 17]];
+    for (let i = 0; i < 4; i++) parts.push(["smile", 0.2], ["calm", 2.8]);
+    parts.push(["calm", 6]);
+    const inputs = parts.flatMap(([who, t]) => ["-loop", "1", "-t", String(t), "-i", who === "calm" ? calm : smile]);
+    const chains = parts.map((_, i) => `[${i}]${FIT}[p${i}]`).join(";");
+    execFileSync("ffmpeg", ["-loglevel", "error", "-y", ...inputs, "-filter_complex", `${chains};${parts.map((_, i) => `[p${i}]`).join("")}concat=n=${parts.length}:v=1[v]`,
+      "-map", "[v]", "-r", "15", "-pix_fmt", "yuv420p", y4m]);
+    return y4m;
+  }
   if (kind === "two") {
     const HALF = "scale=320:480:force_original_aspect_ratio=decrease,pad=320:480:(ow-iw)/2:(oh-ih)/2,setsar=1";
     execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-loop", "1", "-t", "4", "-i", calm, "-loop", "1", "-t", "4", "-i", smile,
@@ -331,6 +348,51 @@ await test("releases the camera and screen when you leave or finish", async () =
   await page.click("#stop");
   await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
   assert((await live(page)) === 0, `tracks still live after Stop: ${await live(page)}`);
+});
+
+await test("ignores brief twitches (noisy expressions)", async () => {
+  const page = await launch({ camera: "blips" });
+  await startPlaytest(page);
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(12000);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
+  const kinds = await page.$$eval(".moment", (els) => els.map((e) => e.dataset.kind));
+  console.log(`  (pins from four 0.2 s smiles: [${kinds}])`);
+  await page.screenshot({ path: `${OUT}blips.png` });
+  assert(kinds.length === 0, `twitches became pins: [${kinds}]`);
+});
+
+await test("copes with a dim room", async () => {
+  const page = await launch({ camera: "dim" });
+  await startPlaytest(page);
+  const outcome = await Promise.race([
+    page.waitForSelector("#stop:not([disabled])", { timeout: 30000 }).then(() => "recording"),
+    page.waitForSelector("#calib-failed", { timeout: 30000 }).then(() => "asked to retry"),
+  ]);
+  if (outcome === "recording") {
+    await page.waitForTimeout(9000);
+    await page.click("#stop");
+    await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
+  }
+  const kinds = await page.$$eval(".moment", (els) => els.map((e) => e.dataset.kind));
+  console.log(`  (dim room: ${outcome}; pins [${kinds}])`);
+  await page.screenshot({ path: `${OUT}dim.png` });
+});
+
+await test("keeps the recording reachable when browser storage is blocked", async () => {
+  const page = await launch({ init: () => { indexedDB.open = () => { throw new DOMException("blocked", "SecurityError"); }; } });
+  await page.waitForSelector(".sessions .notice");
+  await startPlaytest(page);
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await page.click("#stop");
+  await page.waitForSelector("#unsaved", { timeout: 20000 });
+  const downloads = [];
+  page.on("download", (d) => downloads.push(d));
+  await page.click("#unsaved button");
+  await page.waitForTimeout(1200);
+  assert(downloads.length === 2, `expected 2 downloads from the banner, got ${downloads.length}`);
 });
 
 await test("asks to retry calibration when no face is visible", async () => {

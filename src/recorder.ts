@@ -34,7 +34,7 @@ export class SessionRecorder {
         videoBitsPerSecond: bits,
       });
       rec.ondataavailable = (e) => e.data.size && this.chunks[i].push(e.data);
-      rec.onerror = (e) => this.onError((e as ErrorEvent).message || "The recorder stopped unexpectedly.");
+      rec.onerror = () => this.onError("The recorder stopped unexpectedly.");
       rec.start(1000);
       return rec;
     });

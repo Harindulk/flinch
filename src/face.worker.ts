@@ -30,7 +30,8 @@ self.onmessage = async (e: MessageEvent<Init | "stop">) => {
     return;
   }
   post({ type: "ready" });
-  if (audio) readAudio(audio);
+  // Losing the mic stream only loses the loudness boost; the face reads carry on.
+  if (audio) readAudio(audio).catch(() => {});
 
   const reader = video.getReader();
   let last = 0;
@@ -49,7 +50,7 @@ self.onmessage = async (e: MessageEvent<Init | "stop">) => {
       const cats = i < 0 ? undefined : r.faceBlendshapes?.[i]?.categories;
       const shapes = cats ? Object.fromEntries(cats.filter((c) => USED.includes(c.categoryName)).map((c) => [c.categoryName, c.score])) : null;
       post({ type: "face", at, shapes, faces: r.faceLandmarks.length });
-    } catch (err) {
+    } catch {
       post({ type: "face", at, shapes: null, faces: 0 });
     } finally {
       frame.close();

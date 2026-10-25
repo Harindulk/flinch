@@ -127,7 +127,7 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
     await wait(200);
   } finally {
     await new Promise<void>((done) => (rec.state === "inactive" ? done() : ((rec.onstop = () => done()), rec.stop())));
-    audio.close();
+    void audio.close();
     for (const v of [game, face]) {
       URL.revokeObjectURL(v.src);
       v.removeAttribute("src");

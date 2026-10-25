@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "lint": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.1"
