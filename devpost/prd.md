@@ -52,6 +52,7 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
   - [ ] If the face leaves the camera, the line shows a gap and a "face lost" label instead of dropping to zero.
 
 ### Automatic bookmarks
+Pins are labelled "Possible frustration" and "Possible delight": Flinch measures facial-expression changes against the tester's resting face, not feelings, and says so on Review and in the notes file.
 - As a dev, I want the strongest reactions pinned for me so that I don't have to scrub the whole video.
   - [ ] After Stop, pins appear where a signal rose clearly above that tester's calibrated resting level for at least about half a second.
   - [ ] Pins closer than five seconds together merge into one; at most the 12 strongest are kept.
@@ -61,6 +62,7 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 ### Review and notes
 - As a dev, I want to jump to each moment and write what went wrong so that I end with a fix list.
   - [ ] Clicking a pin or row seeks to three seconds before the moment and plays.
+  - [ ] A fresh session opens on its strongest moment, paused just before it, with a "Replay it" button; previous/next-moment buttons and N/P step through pins.
   - [ ] Each moment shows type, timecode, strength, and a thumbnail taken from the recording.
   - [ ] Notes and dismissals are saved immediately and survive a page refresh.
 
@@ -79,7 +81,11 @@ Source: `scope.md > The Unique Kernel`, `scope.md > Who It's For`.
 - **First use**: Home shows no sessions and explains the three steps (pick window, camera on, calibrate).
 - **Camera or screen permission denied**: the tile says what was blocked and how to allow it in Chrome; nothing crashes.
 - **No camera on the machine**: the tile says Flinch needs a webcam.
-- **Face lost while recording**: gap in the line plus a label; recording continues.
+- **Face lost while recording**: gap in the line plus a "Face lost" chip; recording continues. Review warns if the face was out of view for most of the session.
+- **Two faces in view**: Flinch follows the face nearest the camera and says so during calibration and recording.
+- **Face model fails to load**: a message with Try again; nothing is recorded until it works.
+- **Refresh or close mid-session**: Chrome asks before leaving, so a recording isn't lost by accident.
+- **Very short session**: Review says it was too short to find reactions.
 - **No moments found**: Review says "No big reactions this time" and still shows the timeline and manual marks.
 - **Storage full or unavailable**: Flinch offers to download the recording right away so it isn't lost.
 - **Unsupported browser**: Home says Flinch needs desktop Chrome or Edge.

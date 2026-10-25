@@ -84,6 +84,10 @@ PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`.
 `src/timeline.ts`: one canvas drawing function used by both the live strip (last 30 s) and the review timeline (whole session, with pins and a playhead). Gaps where there was no face.
 PRD ref: `prd.md > Features and Behavior > Live reaction line`, `> Review and notes`.
 
+### Labels and icons
+`src/labels.ts`: the calibrated words used everywhere ("Possible frustration", "Expression change"), so the app never presents an inferred feeling as fact. `src/icons.ts`: a few inline 16 px SVG icons; no icon font or network.
+PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`.
+
 ### Session store
 `src/store.ts`: a thin IndexedDB wrapper: `listSessions`, `getSession`, `saveSession`, `updateMoment`, `deleteSession`. Two object stores: `sessions` (everything but the video) and `videos` (the Blob by session id).
 PRD ref: `prd.md > Features and Behavior > Saved sessions`.
@@ -145,7 +149,10 @@ None at runtime. No API, no key, no network call after the page loads. `npm inst
 - **Camera, mic or screen permission denied** → the tile explains what was blocked and how to allow it; Calibrate stays disabled.
 - **Face not found (bad light, too far)** → calibration asks to retry; during recording the line shows gaps and a "face lost" label.
 - **IndexedDB write fails (quota, private window)** → a banner with a Download recording button so the playtest isn't lost.
-- **The shared window closes mid-session** → treated as Stop; whatever was recorded is saved.
+- **The shared window closes mid-session** → treated as Stop; whatever was recorded is saved. A MediaRecorder error does the same.
+- **Face model fails to load** → message with Try again (the failed worker is terminated first).
+- **Two faces** → the worker asks MediaPipe for up to two faces and scores the one with the biggest landmark box.
+- **Memory on long sessions** → recordings are held in memory until Stop (game at 2.5 Mbit/s, about 20 MB a minute in total); after 20 minutes the record screen suggests stopping. Streaming chunks to IndexedDB would lift this limit.
 
 ## What Was Simplified and Why
 - **Plain DOM** instead of React — four screens don't need a framework, and the code tour stays readable.

@@ -38,11 +38,18 @@ Playtests are kept in the browser (IndexedDB) until you delete them from the hom
 - **Moments.** `src/moments.ts` pins places where a signal stays 2.5 spreads above rest for at least half a second, boosts the ones where the mic was loud (a groan, a laugh), merges moments closer than five seconds, and keeps the strongest twelve plus your manual marks.
 - **Highlight reel.** `src/export.ts` plays each kept moment (3 s before to 3 s after) into a canvas recorder after a title card, drawing the reaction line underneath. It records MP4 where Chrome supports it, WebM otherwise. Sound goes into the file only, not the speakers.
 
+## Limits
+
+- Desktop Chrome or Edge only (Firefox and Safari lack the insertable-streams API the face worker uses; Flinch says so on the home screen).
+- Recordings stay in memory until Stop, about 20 MB a minute; Flinch suggests stopping after 20 minutes.
+- Session recordings are WebM. The highlight reel is MP4 when the browser can record it, otherwise WebM, and the app says which.
+- Pins mark facial-expression changes, not feelings. Thresholds are starting points (`src/moments.ts`).
+
 ## Tests
 
 ```bash
 npm test        # unit tests: signals, moments, notes export
-npm run e2e     # headless Chromium (muted) with a fake camera, mic and screen
+npm run e2e     # headless Chromium (muted) with a fake camera, mic and screen: 11 journeys incl. failures
 npm run build && E2E_PREVIEW=1 npm run e2e   # the same against the production build
 ```
 
