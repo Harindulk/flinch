@@ -77,7 +77,10 @@ const browsers = [];
 async function launch({ camera = "face", denyCamera = false, init = null, block = null } = {}) {
   const args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--auto-select-desktop-capture-source=Entire screen", "--mute-audio"];
   if (camera !== "pattern") args.push(`--use-file-for-fake-video-capture=${await fixture(camera)}`);
-  const browser = await chromium.launch({ args });
+  // E2E_FULL=1 uses Playwright's full Chromium, which (unlike the headless shell) really hides background tabs.
+  // Playwright normally disables Chrome's background throttling; keep Chrome's real behaviour.
+  const ignoreDefaultArgs = ["--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--disable-background-timer-throttling"];
+  const browser = await chromium.launch({ args, ignoreDefaultArgs });
   browsers.push(browser);
   const [vw, vh] = (process.env.E2E_VIEWPORT ?? "1440x900").split("x").map(Number); // e.g. E2E_VIEWPORT=1280x720
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: vw, height: vh } });
@@ -393,6 +396,30 @@ await test("keeps the recording reachable when browser storage is blocked", asyn
   await page.click("#unsaved button");
   await page.waitForTimeout(1200);
   assert(downloads.length === 2, `expected 2 downloads from the banner, got ${downloads.length}`);
+});
+
+await test("keeps a reaction that happens while the page stutters", async () => {
+  // Stand-in for a busy or background page: three 1 s stalls of the page's own thread while the
+  // tester smiles. (Automated Chromium never reports a tab as hidden, so a real background tab
+  // can't be reproduced here.) Live face reads that go missing are read back from the recording.
+  const page = await launch({ camera: "reaction" }); // the smile lands ~4–7 s in
+  await startPlaytest(page);
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  for (let i = 0; i < 3; i++) {
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => { const t = performance.now(); while (performance.now() - t < 1000) {} });
+  }
+  await page.waitForTimeout(4000);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  const faces = Number(await page.getAttribute("#review", "data-faces"));
+  const gap = Number(await page.getAttribute("#review", "data-max-gap"));
+  const d = await page.$$eval(".stage video", (vs) => vs.map((v) => v.duration));
+  const kinds = await page.$$eval(".moment", (els) => els.map((e) => e.dataset.kind));
+  console.log(`  (three 1 s stalls: ${faces} face samples, largest gap ${gap.toFixed(2)} s, recordings ${d.map((x) => x.toFixed(1))} s, pins [${kinds}])`);
+  assert(gap < 0.5, `face samples have a ${gap} s hole`);
+  assert(d.every((x) => x > 9), `recordings lost time: ${d}`);
+  assert(kinds.includes("delight"), "the smile during the stalls was lost");
 });
 
 await test("asks to retry calibration when no face is visible", async () => {

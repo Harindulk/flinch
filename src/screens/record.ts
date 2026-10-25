@@ -7,7 +7,8 @@ import { SIGNAL_LABEL } from "../labels";
 import { show, type Screen } from "../nav";
 import { SessionRecorder, type Recording } from "../recorder";
 import { download } from "../dom";
-import { calibrate, rawSignals, Scorer, type Raw } from "../signals";
+import { calibrate, rawSignals, Scorer, type Baseline, type Raw } from "../signals";
+import { fillGaps, findGaps } from "../backfill";
 import { drawTimeline } from "../timeline";
 import { findMoments, THRESHOLD } from "../moments";
 import { addThumbs } from "../thumbs";
@@ -70,6 +71,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
     let reader: FaceReader | null = null;
     let rec: SessionRecorder | null = null;
     let scorer: Scorer | null = null;
+    let baseline: Baseline | null = null;
     let calib: Raw[] = [];
     let calibFrames = 0;
     let lastFaceAt = 0;
@@ -161,7 +163,8 @@ export function recordScreen(ctx: RecordCtx): Screen {
     };
 
     const startRecording = () => {
-      scorer = new Scorer(calibrate(calib));
+      baseline = calibrate(calib);
+      scorer = new Scorer(baseline);
       rec = new SessionRecorder(ctx.game, ctx.cam);
       rec.onError = () => void finish();
       rec.start();
@@ -203,6 +206,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
       stopBtn.disabled = markBtn.disabled = true;
       status.textContent = "Saving…";
       const steps = [step("Stopping the recording", "st-stop"), step("Finding possible reactions", "st-find"), step("Saving on this computer", "st-save")];
+      fillStep = steps[1];
       overlay.hidden = false;
       say(h("h2", {}, "Wrapping up"), h("ol", { class: "steps-done" }, ...steps));
       const done = (i: number) => steps[i].classList.replace("pending", "done");
@@ -221,12 +225,20 @@ export function recordScreen(ctx: RecordCtx): Screen {
       }
     };
     let lastRecording: Recording | null = null;
+    let fillStep: HTMLElement | null = null;
     const wrapUp = async (done: (i: number) => void) => {
       const recording = await rec!.stop();
       lastRecording = recording;
       stopStream(ctx.game);
       stopStream(ctx.cam);
       done(0);
+      if (baseline && findGaps(samples, recording.duration).length) {
+        const label = fillStep!.lastChild!;
+        await fillGaps(samples, recording.face, recording.duration, baseline, (f) => {
+          label.textContent = `Reading gaps from the recording… ${Math.round(f * 100)}%`;
+        }).catch(() => 0); // without the fill, the gaps simply stay shaded on the timeline
+        label.textContent = "Finding possible reactions";
+      }
       const moments = findMoments(samples, marks);
       await addThumbs(moments, recording);
       done(1);

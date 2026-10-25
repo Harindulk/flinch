@@ -227,7 +227,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
 
     const faceShare = session.samples.length ? session.samples.filter((x) => x.face).length / session.samples.length : 1;
     root.append(
-      h("main", { class: "review", id: "review", dataset: { samples: String(session.samples.length), faces: String(session.samples.filter((x) => x.face).length) } },
+      h("main", { class: "review", id: "review", dataset: { samples: String(session.samples.length), faces: String(session.samples.filter((x) => x.face).length), maxGap: String(maxGap(session)) } },
         h("header", { class: "bar" },
           h("button", { class: "ghost", onclick: () => show(homeScreen()) }, icon("back"), "Playtests"),
           h("div", { class: "title-block" },
@@ -283,4 +283,11 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
       player.destroy();
     };
   };
+}
+
+/** Longest stretch without a face read, for the end-to-end checks (data-max-gap). */
+function maxGap(s: Session): number {
+  let gap = 0;
+  for (let i = 1; i < s.samples.length; i++) gap = Math.max(gap, s.samples[i].t - s.samples[i - 1].t);
+  return Math.round(gap * 100) / 100;
 }

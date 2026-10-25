@@ -1,5 +1,5 @@
 /** One processed camera frame. f and d are calibrated scores: how many "spreads" above this tester's resting face. */
-export type Sample = { t: number; f: number; d: number; loud: number; face: boolean };
+export type Sample = { t: number; f: number; d: number; loud: number; face: boolean; filled?: boolean /* read from the recording after Stop */ };
 
 export type MomentKind = "frustration" | "delight" | "mark";
 
