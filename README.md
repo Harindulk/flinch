@@ -41,16 +41,19 @@ Playtests are kept in the browser (IndexedDB) until you delete them from the hom
 ## Limits
 
 - Desktop Chrome or Edge only (Firefox and Safari lack the insertable-streams API the face worker uses; Flinch says so on the home screen).
-- Recordings stay in memory until Stop, about 20 MB a minute; Flinch suggests stopping after 20 minutes.
+- Recordings are held until Stop: up to about 20 MB a minute of real gameplay (7 MB a minute in the 10-minute soak test, whose fake screen compresses easily). In that soak the page's memory stayed flat (JS heap 10 MB throughout) and Stop → Review took 4 s. Flinch suggests stopping after 20 minutes.
 - Session recordings are WebM. The highlight reel is MP4 when the browser can record it, otherwise WebM, and the app says which.
+- If live face reads go missing (a busy or background page), Flinch reads those stretches back from the face recording after Stop. A page frozen for many seconds stalls Chrome's recorders too, so that stretch can't be recovered.
 - Pins mark facial-expression changes, not feelings. Thresholds are starting points (`src/moments.ts`).
 
 ## Tests
 
 ```bash
-npm test        # unit tests: signals, moments, notes export
+npm run lint    # strict TypeScript checks
+npm test        # unit tests: signals, moments, gaps, notes export
 npm run e2e     # headless Chromium (muted) with a fake camera, mic and screen: 11 journeys incl. failures
 npm run build && E2E_PREVIEW=1 npm run e2e   # the same against the production build
+SOAK_MIN=10 npm run e2e -- soak             # a 10-minute recording, sampling memory
 ```
 
 The end-to-end run downloads two of MediaPipe's public test images into `e2e/out/` and splices them into a fake camera video (a calm face, then a smile), so the whole path from face to pin to reel is exercised without a real webcam.

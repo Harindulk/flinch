@@ -151,6 +151,7 @@ None at runtime. No API, no key, no network call after the page loads. `npm inst
 - **IndexedDB write fails (quota, private window)** → a banner with a Download recording button so the playtest isn't lost.
 - **The shared window closes mid-session** → treated as Stop; whatever was recorded is saved. A MediaRecorder error does the same.
 - **Face model fails to load** → message with Try again (the failed worker is terminated first).
+- **Live face reads go missing** (a busy or background page stalls the frames on their way to the worker) → after Stop, `src/backfill.ts` reads those stretches from the face recording at 10 frames a second, so reactions there are still found. Tested with three 1 s stalls during a smile. Limit: if the page is completely frozen for many seconds, Chrome's recorders stall too (seen in a 6 s freeze test), so nothing can be recovered for that stretch.
 - **Two faces** → the worker asks MediaPipe for up to two faces and scores the one with the biggest landmark box.
 - **Memory on long sessions** → recordings are held in memory until Stop (game at 2.5 Mbit/s, about 20 MB a minute in total); after 20 minutes the record screen suggests stopping. Streaming chunks to IndexedDB would lift this limit.
 

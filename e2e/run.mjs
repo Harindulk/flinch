@@ -422,6 +422,39 @@ await test("keeps a reaction that happens while the page stutters", async () => 
   assert(kinds.includes("delight"), "the smile during the stalls was lost");
 });
 
+// SOAK_MIN=10 npm run e2e -- soak : a long recording, sampling memory (not part of the normal run).
+if (process.env.SOAK_MIN) await test("soak: memory over a long recording", async () => {
+  const minutes = Number(process.env.SOAK_MIN);
+  const page = await launch({ camera: "reaction" });
+  await startPlaytest(page);
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  const rssMb = () => {
+    const rows = execFileSync("ps", ["-A", "-o", "pid=,ppid=,rss="]).toString().trim().split("\n").map((l) => l.trim().split(/\s+/).map(Number));
+    const mine = new Set([process.pid]);
+    for (let grew = true; grew; ) { grew = false; for (const [pid, ppid] of rows) if (mine.has(ppid) && !mine.has(pid)) { mine.add(pid); grew = true; } }
+    return Math.round(rows.filter(([pid]) => mine.has(pid) && pid !== process.pid).reduce((n, [, , rss]) => n + rss, 0) / 1024);
+  };
+  const log = [];
+  for (let m = 0; m <= minutes * 2; m++) {
+    const heap = await page.evaluate(() => Math.round(performance.memory.usedJSHeapSize / 1048576));
+    log.push({ min: m / 2, heapMb: heap, browserRssMb: rssMb() });
+    console.log(`  ${(m / 2).toFixed(1)} min: JS heap ${heap} MB, browser processes ${log.at(-1).browserRssMb} MB`);
+    if (m < minutes * 2) await page.waitForTimeout(30000);
+  }
+  const t0 = Date.now();
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 120000 });
+  const got = [];
+  page.on("download", (d) => got.push(d));
+  await page.click("#download-recording");
+  await page.waitForTimeout(3000);
+  let bytes = 0;
+  for (const d of got) { const p = `${OUT}soak-${d.suggestedFilename()}`; await d.saveAs(p); bytes += readFileSync(p).length; }
+  const summary = { minutes, stopToReviewS: (Date.now() - t0) / 1000, recordingMb: Math.round(bytes / 1048576), mbPerMin: +(bytes / 1048576 / minutes).toFixed(1), afterStopRssMb: rssMb(), log };
+  writeFileSync(`${OUT}soak.json`, JSON.stringify(summary, null, 2));
+  console.log(`  stop→review ${summary.stopToReviewS}s; recordings ${summary.recordingMb} MB (${summary.mbPerMin} MB/min)`);
+});
+
 await test("asks to retry calibration when no face is visible", async () => {
   const page = await launch({ camera: "pattern" });
   await startPlaytest(page);
