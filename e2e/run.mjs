@@ -295,6 +295,31 @@ await test("notices two faces and warns before a refresh loses a recording", asy
   await d.dismiss();
 });
 
+await test("releases the camera and screen when you leave or finish", async () => {
+  const track = () => {
+    window.__streams = [];
+    for (const k of ["getUserMedia", "getDisplayMedia"]) {
+      const orig = navigator.mediaDevices[k].bind(navigator.mediaDevices);
+      navigator.mediaDevices[k] = async (c) => { const s = await orig(c); window.__streams.push(s); return s; };
+    }
+  };
+  const live = (page) => page.evaluate(() => window.__streams.flatMap((s) => s.getTracks()).filter((t) => t.readyState === "live").length);
+  const page = await launch({ init: track });
+  await page.click("#new-playtest");
+  await page.click("#game-tile-btn");
+  await page.click("#cam-tile-btn");
+  await page.waitForSelector("#cam-tile.ok");
+  assert((await live(page)) >= 2, "expected live tracks after setup");
+  await page.click("button:has-text('Back')");
+  assert((await live(page)) === 0, `tracks still live after Back: ${await live(page)}`);
+  await startPlaytest(page);
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
+  assert((await live(page)) === 0, `tracks still live after Stop: ${await live(page)}`);
+});
+
 await test("asks to retry calibration when no face is visible", async () => {
   const page = await launch({ camera: "pattern" });
   await startPlaytest(page);

@@ -50,6 +50,15 @@ describe("findMoments", () => {
     expect(Math.min(...m.map((x) => x.t))).toBeGreaterThan(150); // the later, stronger ones won
   });
 
+  it("handles an hour-long session quickly (it also runs live, once a second)", () => {
+    const hour = session(3600, (t) => (Math.floor(t) % 97 === 0 ? { f: 5 } : {}));
+    expect(hour.length).toBe(54000);
+    const t0 = performance.now();
+    const m = findMoments(hour);
+    expect(performance.now() - t0).toBeLessThan(150);
+    expect(m).toHaveLength(MAX_MOMENTS);
+  });
+
   it("always includes manual marks", () => {
     const m = findMoments(session(30), [5, 20.25]);
     expect(m.map((x) => [x.kind, x.t])).toEqual([["mark", 5], ["mark", 20.25]]);
