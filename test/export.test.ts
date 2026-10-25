@@ -18,8 +18,13 @@ describe("notesMarkdown", () => {
   it("lists kept moments with timecode, reaction, strength and note", () => {
     expect(md).toContain("# Flinch playtest: Kasun · Drive Away 0.9");
     expect(md).toContain("2:31 long · 2 moments");
-    expect(md).toContain("| 0:42 | Frustration | 6.1× | jump too far \\| again |");
-    expect(md).toContain("| 1:35 | Marked | — | boss intro |");
+    expect(md).toContain("| 0:42 | Possible frustration | 6.1× | jump too far \\| again |");
+    expect(md).toContain("| 1:35 | Your mark | — | boss intro |");
+  });
+
+  it("says what is measured, without claiming feelings", () => {
+    expect(md).toContain("facial-expression changes");
+    expect(md).not.toMatch(/\| (Frustration|Delight) \|/);
   });
 
   it("leaves out dismissed moments", () => {
@@ -27,6 +32,6 @@ describe("notesMarkdown", () => {
   });
 
   it("says so when nothing was pinned", () => {
-    expect(notesMarkdown({ ...base, moments: [] })).toContain("No reactions were pinned");
+    expect(notesMarkdown({ ...base, moments: [] })).toContain("No moments were pinned");
   });
 });

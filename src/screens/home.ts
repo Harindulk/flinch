@@ -1,6 +1,7 @@
 import { h } from "../dom";
 import { browserSupported } from "../capture";
 import { timecode } from "../format";
+import { icon } from "../icons";
 import { show, type Screen } from "../nav";
 import { deleteSession, getSession, listSessions } from "../store";
 import type { Session } from "../types";
@@ -19,7 +20,7 @@ export function homeScreen(): Screen {
 
     const row = (s: Session) => {
       const moments = s.moments.filter((m) => !m.dismissed).length;
-      const del = h("button", { class: "ghost", title: "Delete this playtest" }, "Delete");
+      const del = h("button", { class: "ghost", title: "Delete this playtest", ariaLabel: `Delete the playtest with ${s.tester}` }, icon("trash"), "Delete");
       const cover = s.moments.find((m) => m.thumb && !m.dismissed)?.thumb;
       const el = h("article", { class: "session-row", dataset: { id: s.id } },
         cover ? h("img", { class: "cover", src: cover, alt: "" }) : h("div", { class: "cover" }),
@@ -53,7 +54,7 @@ export function homeScreen(): Screen {
         ),
         heroLine(),
         ok
-          ? h("button", { class: "primary big", id: "new-playtest", onclick: () => show(setupScreen()) }, "New playtest")
+          ? h("button", { class: "primary big", id: "new-playtest", onclick: () => show(setupScreen()) }, icon("play"), "New playtest")
           : h("p", { class: "notice warn", id: "unsupported" },
               window.isSecureContext
                 ? "Flinch needs desktop Chrome or Edge: it uses screen recording and camera features other browsers don't have yet."
@@ -62,7 +63,7 @@ export function homeScreen(): Screen {
         h("ol", { class: "steps" },
           h("li", {}, h("b", {}, "Pick the game window"), " — any game: a browser tab, a Unity build, an emulator."),
           h("li", {}, h("b", {}, "Turn on the camera"), " — Flinch learns your tester's resting face in ten seconds."),
-          h("li", {}, h("b", {}, "Play, then Stop"), " — the moments they flinched, groaned or grinned come back pinned."),
+          h("li", {}, h("b", {}, "Play, then Stop"), " — the moments their face changed most come back pinned. Click one to replay it."),
         ),
         h("p", { class: "privacy" }, "Nothing leaves this computer. Recordings and face data stay in this browser."),
       ),

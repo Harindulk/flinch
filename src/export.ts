@@ -1,12 +1,12 @@
 import { h } from "./dom";
 import { timecode } from "./format";
 import { THRESHOLD } from "./moments";
+import { KIND_LABEL, MEASURE_NOTE } from "./labels";
 import { loadVideo, seekTo } from "./player";
 import { paintFrame } from "./thumbs";
 import { drawTimeline } from "./timeline";
 import type { Moment, Session, Videos } from "./types";
 
-const LABEL = { frustration: "Frustration", delight: "Delight", mark: "Marked" } as const;
 const COLOR = { frustration: "#ff5d5d", delight: "#b8f35a", mark: "#ffb547" } as const;
 export const REEL_BEFORE = 3;
 export const REEL_AFTER = 3;
@@ -25,12 +25,16 @@ export function notesMarkdown(s: Session): string {
     `${when} · ${timecode(s.duration)} long · ${kept.length} moment${kept.length === 1 ? "" : "s"}`,
     "",
   ];
-  if (!kept.length) lines.push("No reactions were pinned in this session.");
+  if (!kept.length) lines.push("No moments were pinned in this session.");
   else {
-    lines.push("| Time | Reaction | Strength | Note |", "|---|---|---|---|");
-    for (const m of kept) lines.push(`| ${timecode(m.t)} | ${LABEL[m.kind]} | ${m.kind === "mark" ? "—" : `${m.strength.toFixed(1)}×`} | ${cell(m.note) || " "} |`);
+    lines.push("| Time | Moment | Expression change | Note |", "|---|---|---|---|");
+    for (const m of kept) lines.push(`| ${timecode(m.t)} | ${KIND_LABEL[m.kind]} | ${m.kind === "mark" ? "—" : `${m.strength.toFixed(1)}×`} | ${cell(m.note) || " "} |`);
   }
-  lines.push("", "Strength is how far above the tester's own resting face the reaction went. Times are from the start of the recording.", "");
+  lines.push(
+    "",
+    `${MEASURE_NOTE} "Expression change" is how many resting spreads above the tester's resting face the change went. Times are from the start of the recording.`,
+    "",
+  );
   return lines.join("\n");
 }
 
@@ -88,7 +92,7 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
       paintFrame(g, game, face, W, H);
       // Moment label, top left.
       g.font = "600 26px system-ui, sans-serif";
-      const label = `${timecode(m.t)} · ${LABEL[m.kind]}`;
+      const label = `${timecode(m.t)} · ${KIND_LABEL[m.kind]}`;
       g.textAlign = "left";
       g.fillStyle = "rgba(17,18,20,0.85)";
       g.beginPath();
@@ -116,7 +120,7 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
     await card("Flinch", `${s.tester} playing ${s.build} · ${kept.length} moment${kept.length === 1 ? "" : "s"}`, "#ecebe6", 1500);
     for (const [i, m] of kept.entries()) {
       onProgress(i, kept.length);
-      await card(`${timecode(m.t)} · ${LABEL[m.kind]}`, m.note || (m.kind === "mark" ? "Marked during play" : `${m.strength.toFixed(1)}× above resting face`), COLOR[m.kind], 1000);
+      await card(`${timecode(m.t)} · ${KIND_LABEL[m.kind]}`, m.note || (m.kind === "mark" ? "Marked during play" : `Expression change ${m.strength.toFixed(1)}× the tester's resting spread`), COLOR[m.kind], 1000);
       await clip(m);
     }
     onProgress(kept.length, kept.length);

@@ -33,6 +33,12 @@ async function fixture(kind = "face") {
     return y4m;
   }
   const calm = await asset("business-person.png");
+  if (kind === "two") {
+    const HALF = "scale=320:480:force_original_aspect_ratio=decrease,pad=320:480:(ow-iw)/2:(oh-ih)/2,setsar=1";
+    execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-loop", "1", "-t", "4", "-i", calm, "-loop", "1", "-t", "4", "-i", smile,
+      "-filter_complex", `[0]${HALF}[a];[1]${HALF}[b];[a][b]hstack=inputs=2[v]`, "-map", "[v]", "-r", "15", "-pix_fmt", "yuv420p", y4m]);
+    return y4m;
+  }
   execFileSync("ffmpeg", ["-loglevel", "error", "-y",
     "-loop", "1", "-t", "17", "-i", calm, "-loop", "1", "-t", "3", "-i", smile, "-loop", "1", "-t", "10", "-i", calm,
     "-filter_complex", `[0]${FIT}[a];[1]${FIT}[b];[2]${FIT}[c];[a][b][c]concat=n=3:v=1[v]`, "-map", "[v]", "-r", "15", "-pix_fmt", "yuv420p", y4m]);
@@ -51,16 +57,19 @@ await new Promise((ok, fail) => {
 const only = process.argv[2];
 const results = [];
 const browsers = [];
-async function launch({ camera = "face", denyCamera = false } = {}) {
+async function launch({ camera = "face", denyCamera = false, init = null, block = null } = {}) {
   const args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--auto-select-desktop-capture-source=Entire screen", "--mute-audio"];
   if (camera !== "pattern") args.push(`--use-file-for-fake-video-capture=${await fixture(camera)}`);
   const browser = await chromium.launch({ args });
   browsers.push(browser);
-  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 900 } });
+  const [vw, vh] = (process.env.E2E_VIEWPORT ?? "1440x900").split("x").map(Number); // e.g. E2E_VIEWPORT=1280x720
+  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: vw, height: vh } });
   // Headless Chromium can't show a real "Block" choice, so make getUserMedia fail the way a blocked camera does.
   if (denyCamera) await context.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));
   });
+  if (init) await context.addInitScript(init);
+  if (block) await context.route(block, (r) => r.abort());
   const page = await context.newPage();
   page.on("pageerror", (e) => console.log("  [pageerror]", e.message));
   await page.addInitScript(() => addEventListener("unhandledrejection", (e) => console.error("unhandled: " + (e.reason?.stack ?? e.reason))));
@@ -138,6 +147,10 @@ await test("pins a smile and a manual mark, and clicking a pin replays it", asyn
   });
   const stopToReady = (Date.now() - stoppedAt) / 1000;
   assert(stopToReady < 7, `review took ${stopToReady}s to get ready`);
+  assert(await page.isVisible("#fresh"), "a fresh session should announce what was found");
+  await page.waitForFunction(() => document.querySelector(".moment.selected"), null, { timeout: 5000 });
+  const openedAt = await page.$eval(".stage video.game", (v) => v.currentTime);
+  assert(openedAt > 2, `review should open just before the strongest moment, at ${openedAt}`);
   const kinds = await page.$$eval(".moment", (els) => els.map((e) => e.dataset.kind));
   assert(kinds.includes("delight"), `expected a delight moment, got [${kinds}]`);
   assert(kinds.includes("mark"), `expected a manual mark, got [${kinds}]`);
@@ -147,12 +160,15 @@ await test("pins a smile and a manual mark, and clicking a pin replays it", asyn
   await page.waitForFunction(() => !document.querySelector(".stage video.game").paused, null, { timeout: 5000 });
   const t = await page.$eval(".stage video.game", (v) => v.currentTime);
   assert(t > 0.5, `expected the player to jump to the moment, at ${t}`);
+  await page.waitForTimeout(1500);
+  const drift = await page.$$eval(".stage video", ([g, f]) => Math.abs(g.currentTime - f.currentTime));
+  assert(drift < 0.3, `face video drifted ${drift.toFixed(2)} s from the game`);
   await page.screenshot({ path: `${OUT}review-reaction.png` });
 
   const [notes] = await Promise.all([page.waitForEvent("download"), page.click("#download-notes")]);
   await notes.saveAs(`${OUT}notes.md`);
   const md = readFileSync(`${OUT}notes.md`, "utf8");
-  assert(md.includes("| Delight |") && md.includes("| Marked |"), `notes file:\n${md}`);
+  assert(md.includes("| Possible delight |") && md.includes("| Your mark |"), `notes file:\n${md}`);
 
   const [reel] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }), page.click("#make-reel")]);
   const reelPath = `${OUT}reel.${reel.suggestedFilename().split(".").pop()}`;
@@ -179,7 +195,7 @@ await test("keeps playtests and notes after a refresh, and deletes them", async 
   await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
   const note = await page.inputValue(".moment.delight textarea");
   assert(note === "Grinned at the drift jump", `note after reload: "${note}"`);
-  await page.click("text=← Playtests");
+  await page.click("button:has-text('Playtests')");
   await page.waitForSelector(".session-row");
   const rows = await page.$$eval(".session-row .title", (els) => els.map((e) => e.textContent));
   assert(rows.length === 1 && rows[0] === "Nimali · Save test", `rows ${rows}`);
@@ -226,9 +242,57 @@ await test("screens (visual check)", async () => {
   await page.click(".moment.delight .kind");
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}s6-review.png` });
-  await page.click("text=← Playtests");
+  await page.click("button:has-text('Playtests')");
   await page.waitForSelector(".session-row");
   await page.screenshot({ path: `${OUT}s7-home-list.png` });
+});
+
+await test("explains a cancelled screen share and a missing webcam", async () => {
+  const page = await launch({ init: () => {
+    navigator.mediaDevices.getDisplayMedia = () => Promise.reject(new DOMException("Permission denied by user", "NotAllowedError"));
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("Requested device not found", "NotFoundError"));
+  } });
+  await page.click("#new-playtest");
+  await page.click("#game-tile-btn");
+  await page.waitForSelector("#game-tile.error");
+  assert(/cancelled/i.test(await page.textContent("#game-tile .tile-msg")), "screen message");
+  await page.click("#cam-tile-btn");
+  await page.waitForSelector("#cam-tile.error");
+  assert(/no webcam/i.test(await page.textContent("#cam-tile .tile-msg")), "camera message");
+  assert(/choose the game window/.test(await page.textContent("#missing")), "start button should say what's missing");
+});
+
+await test("recovers when the face model can't load", async () => {
+  const page = await launch({ block: "**/models/face_landmarker.task" });
+  await startPlaytest(page);
+  await page.waitForSelector("#face-error", { timeout: 30000 });
+  await page.context().unroute("**/models/face_landmarker.task");
+  await page.click("#retry-reader");
+  await page.waitForSelector("#countdown", { timeout: 30000 });
+});
+
+await test("handles a one-second session", async () => {
+  const page = await launch();
+  await startPlaytest(page);
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(1000);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
+  assert(/too short/.test(await page.textContent("#no-moments")), "short-session message");
+});
+
+await test("notices two faces and warns before a refresh loses a recording", async () => {
+  const page = await launch({ camera: "two" });
+  await startPlaytest(page);
+  await page.waitForSelector("#face-check.warn", { timeout: 30000 });
+  assert(/two faces/i.test(await page.textContent("#face-check")), "calibration should mention two faces");
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForFunction(() => /2 faces/.test(document.querySelector("#face-chip")?.textContent ?? ""), null, { timeout: 5000 });
+  const dialog = page.waitForEvent("dialog", { timeout: 5000 });
+  await page.close({ runBeforeUnload: true });
+  const d = await dialog;
+  assert(d.type() === "beforeunload", `dialog ${d.type()}`);
+  await d.dismiss();
 });
 
 await test("asks to retry calibration when no face is visible", async () => {

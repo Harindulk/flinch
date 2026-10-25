@@ -1,5 +1,6 @@
 import { h } from "../dom";
 import { CaptureError, openCamera, pickWindow, stopStream } from "../capture";
+import { icon, type IconName } from "../icons";
 import { show, type Screen } from "../nav";
 import { homeScreen } from "./home";
 import { recordScreen } from "./record";
@@ -14,29 +15,39 @@ export function setupScreen(): Screen {
     const build = h("input", { id: "build", placeholder: "e.g. Drive Away 0.9", maxLength: 60, autocomplete: "off" });
     const consent = h("input", { type: "checkbox", id: "consent" });
     const start = h("button", { class: "primary big", id: "calibrate", disabled: true }, "Calibrate and start");
+    const missing = h("p", { class: "missing", id: "missing", role: "status" });
+    const consentNum = h("span", { class: "num" }, "3");
 
-    const tile = (id: string, title: string, button: string, muted: boolean, hint: string) => {
+    const tile = (n: number, id: string, title: string, ico: IconName, button: string, hint: string) => {
       const video = h("video", { autoplay: true, muted: true, playsInline: true });
       const msg = h("p", { class: "tile-msg" }, hint);
-      const btn = h("button", { class: "secondary", id: `${id}-btn` }, button);
-      const box = h("section", { class: "tile empty", id }, h("h3", {}, title), h("div", { class: "frame" }, video, msg), btn);
-      if (muted) video.muted = true;
-      return { box, video, msg, btn, hint };
+      const btn = h("button", { class: "secondary", id: `${id}-btn` }, icon(ico), button);
+      const num = h("span", { class: "num" }, String(n));
+      const box = h("section", { class: "tile empty", id }, h("h3", {}, num, title), h("div", { class: "frame" }, video, msg), btn);
+      return { box, video, msg, btn, hint, num, n };
     };
-    const gameTile = tile("game-tile", "Game", "Choose game window", true,
+    const gameTile = tile(1, "game-tile", "Game window", "monitor", "Choose game window",
       "Open your game first, then pick its window. Tick “Share audio” if Chrome offers it, so the reel has the game's sound.");
-    const camTile = tile("cam-tile", "Tester", "Turn on camera & mic", true, "The tester's face and voice. Sit them facing a light.");
+    const camTile = tile(2, "cam-tile", "Tester camera", "camera", "Turn on camera & mic", "The tester's face and voice. Sit them facing a light, about an arm's length away.");
     camTile.video.classList.add("mirror");
+
+    const done = (t: typeof gameTile, ok: boolean) => t.num.replaceChildren(ok ? icon("check") : String(t.n));
 
     const refresh = () => {
       start.disabled = !(game && cam && consent.checked);
+      consentNum.replaceChildren(consent.checked ? icon("check") : "3");
+      const todo = [!game && "choose the game window", !cam && "turn on the camera", !consent.checked && "tick the tester's consent"].filter(Boolean);
+      missing.textContent = todo.length ? `To start: ${todo.join(", ")}.` : "Ready. Calibration takes ten seconds, then recording starts.";
+      missing.classList.toggle("ready", !todo.length);
     };
 
     const attach = (t: typeof gameTile, s: MediaStream | null, err?: unknown) => {
       t.video.srcObject = s;
       t.box.classList.toggle("empty", !s);
       t.box.classList.toggle("error", Boolean(err));
+      t.box.classList.toggle("ok", Boolean(s));
       t.msg.textContent = err ? (err instanceof CaptureError ? err.message : String(err)) : t.hint;
+      done(t, Boolean(s));
       refresh();
     };
 
@@ -47,9 +58,9 @@ export function setupScreen(): Screen {
         game.getVideoTracks()[0].addEventListener("ended", () => {
           game = null;
           attach(gameTile, null);
-          gameTile.btn.textContent = "Choose game window";
+          gameTile.btn.replaceChildren(icon("monitor"), "Choose game window");
         });
-        gameTile.btn.textContent = "Choose a different window";
+        gameTile.btn.replaceChildren(icon("monitor"), "Choose a different window");
         attach(gameTile, game);
       } catch (e) {
         game = null;
@@ -60,7 +71,7 @@ export function setupScreen(): Screen {
       try {
         stopStream(cam);
         cam = await openCamera();
-        camTile.btn.textContent = "Camera on";
+        camTile.btn.replaceChildren(icon("check"), cam.getAudioTracks().length ? "Camera and mic on" : "Camera on (no mic found)");
         camTile.btn.disabled = true;
         attach(camTile, cam);
       } catch (e) {
@@ -77,18 +88,22 @@ export function setupScreen(): Screen {
     root.append(
       h("main", { class: "setup" },
         h("header", { class: "bar" },
-          h("button", { class: "ghost", onclick: () => show(homeScreen()) }, "← Back"),
+          h("button", { class: "ghost", onclick: () => show(homeScreen()) }, icon("back"), "Back"),
           h("h2", {}, "New playtest"),
         ),
         h("div", { class: "tiles" }, gameTile.box, camTile.box),
-        h("div", { class: "fields" },
-          h("label", {}, "Tester's first name", tester),
-          h("label", {}, "Build", build),
+        h("section", { class: "tile details" },
+          h("h3", {}, consentNum, "Tester and consent"),
+          h("div", { class: "fields" },
+            h("label", {}, "Tester's first name", tester),
+            h("label", {}, "Build", build),
+          ),
+          h("label", { class: "consent" }, consent, h("span", {}, "I'm the tester and I agree to be recorded. The recording stays on this computer.")),
         ),
-        h("label", { class: "consent" }, consent, h("span", {}, "I'm the tester and I agree to be recorded. The recording stays on this computer.")),
-        start,
+        h("div", { class: "start-row" }, start, missing),
       ),
     );
+    refresh();
 
     return () => {
       if (!handedOff) {

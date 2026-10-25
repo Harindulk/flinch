@@ -17,12 +17,15 @@ export class SessionRecorder {
   readonly mimeType = pickMime();
   private recs: MediaRecorder[] = [];
   private chunks: Blob[][] = [[], []];
+  /** Called if either recorder fails mid-session; the caller should stop and save what exists. */
+  onError: (message: string) => void = () => {};
 
   constructor(private game: MediaStream, private cam: MediaStream) {}
 
   start() {
     const sources = [
-      { stream: this.game, bits: 4_000_000 },
+      // shortcut: chunks stay in memory until Stop (~20 MB a minute at these rates); stream them to IndexedDB if sessions grow past ~30 min.
+      { stream: this.game, bits: 2_500_000 },
       { stream: this.cam, bits: 1_000_000 },
     ];
     this.recs = sources.map(({ stream, bits }, i) => {
@@ -31,6 +34,7 @@ export class SessionRecorder {
         videoBitsPerSecond: bits,
       });
       rec.ondataavailable = (e) => e.data.size && this.chunks[i].push(e.data);
+      rec.onerror = (e) => this.onError((e as ErrorEvent).message || "The recorder stopped unexpectedly.");
       rec.start(1000);
       return rec;
     });
@@ -39,6 +43,11 @@ export class SessionRecorder {
 
   elapsed(): number {
     return this.startedAt ? (nowMs() - this.startedAt) / 1000 : 0;
+  }
+
+  /** Rough bytes recorded so far, to warn before memory gets tight. */
+  bytes(): number {
+    return this.chunks.flat().reduce((n, b) => n + b.size, 0);
   }
 
   async stop(): Promise<Recording> {

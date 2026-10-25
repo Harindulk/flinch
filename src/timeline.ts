@@ -13,6 +13,8 @@ export type TimelineOpts = {
   playhead?: number;
   selected?: string | null;
   threshold?: number;
+  /** Time under the mouse, drawn as a faint guide. */
+  hover?: number;
   /** Fixed size for canvases that aren't on the page (the highlight reel). */
   width?: number;
   height?: number;
@@ -105,13 +107,23 @@ export function drawTimeline(cv: HTMLCanvasElement, samples: Sample[], o: Timeli
     g.moveTo(px, PAD.top - 4);
     g.lineTo(px, hgt - PAD.bottom);
     g.stroke();
+    const r = sel ? 8 : 6;
     g.beginPath();
-    g.moveTo(px - 6, 2);
-    g.lineTo(px + 6, 2);
-    g.lineTo(px, 12);
+    g.moveTo(px - r, 1);
+    g.lineTo(px + r, 1);
+    g.lineTo(px, 2 + r * 1.7);
     g.closePath();
     g.fill();
     g.globalAlpha = 1;
+  }
+
+  if (o.hover !== undefined) {
+    g.strokeStyle = "rgba(236,235,230,0.25)";
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(Math.round(x(o.hover)) + 0.5, 0);
+    g.lineTo(Math.round(x(o.hover)) + 0.5, hgt - PAD.bottom);
+    g.stroke();
   }
 
   if (o.playhead !== undefined) {

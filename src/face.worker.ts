@@ -23,7 +23,7 @@ self.onmessage = async (e: MessageEvent<Init | "stop">) => {
       baseOptions: { modelAssetPath: new URL("models/face_landmarker.task", base).href, delegate: "CPU" },
       runningMode: "VIDEO",
       outputFaceBlendshapes: true,
-      numFaces: 1,
+      numFaces: 2, // so a second person in view is noticed rather than silently read
     });
   } catch (err) {
     post({ type: "error", message: (err as Error)?.message ?? String(err) });
@@ -44,11 +44,13 @@ self.onmessage = async (e: MessageEvent<Init | "stop">) => {
     }
     last = at;
     try {
-      const cats = landmarker.detectForVideo(frame, performance.now()).faceBlendshapes?.[0]?.categories;
+      const r = landmarker.detectForVideo(frame, performance.now());
+      const i = largestFace(r.faceLandmarks);
+      const cats = i < 0 ? undefined : r.faceBlendshapes?.[i]?.categories;
       const shapes = cats ? Object.fromEntries(cats.filter((c) => USED.includes(c.categoryName)).map((c) => [c.categoryName, c.score])) : null;
-      post({ type: "face", at, shapes });
+      post({ type: "face", at, shapes, faces: r.faceLandmarks.length });
     } catch (err) {
-      post({ type: "face", at, shapes: null });
+      post({ type: "face", at, shapes: null, faces: 0 });
     } finally {
       frame.close();
     }
@@ -56,6 +58,17 @@ self.onmessage = async (e: MessageEvent<Init | "stop">) => {
   reader.cancel().catch(() => {});
   landmarker.close();
 };
+
+/** The tester is the face nearest the camera: the one with the biggest landmark box. */
+function largestFace(faces: { x: number; y: number }[][]): number {
+  let best = -1, bestArea = 0;
+  faces.forEach((pts, i) => {
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    const area = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+    if (area > bestArea) [best, bestArea] = [i, area];
+  });
+  return best;
+}
 
 /** Mic loudness (root-mean-square level), reported as the loudest chunk of each ~66 ms window. */
 async function readAudio(stream: ReadableStream<AudioData>) {

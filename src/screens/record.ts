@@ -2,6 +2,8 @@ import { h } from "../dom";
 import { stopStream } from "../capture";
 import { FaceReader } from "../face";
 import { timecode, uid } from "../format";
+import { icon } from "../icons";
+import { SIGNAL_LABEL } from "../labels";
 import { show, type Screen } from "../nav";
 import { SessionRecorder } from "../recorder";
 import { calibrate, rawSignals, Scorer, type Raw } from "../signals";
@@ -9,7 +11,7 @@ import { drawTimeline } from "../timeline";
 import { findMoments, THRESHOLD } from "../moments";
 import { addThumbs } from "../thumbs";
 import { saveSession } from "../store";
-import type { Sample, Session } from "../types";
+import type { Moment, Sample, Session } from "../types";
 import { reviewScreen } from "./review";
 import { setupScreen } from "./setup";
 
@@ -18,6 +20,7 @@ export type RecordCtx = { game: MediaStream; cam: MediaStream; tester: string; b
 export const CALIBRATION_SECONDS = 10;
 const MIN_FACE_SHARE = 0.4; // calibration needs a face in at least this share of frames
 const LIVE_WINDOW = 30;
+const LONG_SESSION_S = 20 * 60; // past this, recordings held in memory get large
 
 export function recordScreen(ctx: RecordCtx): Screen {
   return (root) => {
@@ -27,31 +30,41 @@ export function recordScreen(ctx: RecordCtx): Screen {
     faceVideo.srcObject = ctx.cam;
 
     const clock = h("span", { class: "clock mono", id: "clock" }, "0:00");
-    const stopBtn = h("button", { class: "danger", id: "stop", disabled: true }, "Stop");
-    const markBtn = h("button", { class: "mark", id: "mark", disabled: true, title: "Shortcut: M" }, "Mark moment (M)");
+    const stopBtn = h("button", { class: "danger", id: "stop", disabled: true }, icon("stop"), "Stop");
+    const markBtn = h("button", { class: "mark", id: "mark", disabled: true, title: "Shortcut: M" }, icon("flag"), "Mark", h("kbd", {}, "M"));
     const status = h("span", { class: "rec-status", id: "rec-status" }, "Getting ready");
-    const faceLost = h("span", { class: "face-lost", id: "face-lost", hidden: true }, "Face lost — the tester is out of the camera");
-    const strip = h("canvas", { class: "strip", id: "strip" });
-    const overlayBox = h("div", { class: "box" });
+    const liveCount = h("span", { class: "live-count", id: "live-count" });
+    const faceChip = h("span", { class: "chip", id: "face-chip", hidden: true });
+    const notice = h("span", { class: "chip warn", id: "long-session", hidden: true });
+    const strip = h("canvas", { class: "strip", id: "strip", role: "img", ariaLabel: "Live reaction line for the last 30 seconds" });
+    const overlayBox = h("div", { class: "box", role: "status" });
     const overlay = h("div", { class: "overlay", id: "overlay" }, overlayBox);
 
     root.append(
       h("main", { class: "record" },
-        h("header", { class: "bar" }, status, clock, h("span", { class: "who" }, `${ctx.tester} · ${ctx.build}`), h("span", { class: "spacer" }), markBtn, stopBtn),
+        h("header", { class: "bar" },
+          status, clock,
+          h("span", { class: "who" }, `${ctx.tester} · ${ctx.build}`),
+          liveCount,
+          h("span", { class: "spacer" }),
+          markBtn, stopBtn,
+        ),
         h("div", { class: "stage" }, gameVideo, faceVideo, overlay),
         h("div", { class: "strip-wrap" },
           h("div", { class: "legend" },
-            h("span", {}, h("i", { style: "background:var(--frus)" }), "Frustration"),
-            h("span", {}, h("i", { style: "background:var(--joy)" }), "Delight"),
+            h("span", {}, h("i", { style: "background:var(--frus)" }), SIGNAL_LABEL.f),
+            h("span", {}, h("i", { style: "background:var(--joy)" }), SIGNAL_LABEL.d),
+            h("span", { class: "dim" }, "Dashed line: pin threshold"),
             h("span", { class: "spacer" }),
-            faceLost,
+            notice,
+            faceChip,
           ),
           strip,
         ),
       ),
     );
 
-    const say = (...kids: (Node | string)[]) => overlayBox.replaceChildren(...kids);
+    const say = (...kids: (Node | string | null)[]) => overlayBox.replaceChildren(...kids.filter((k): k is Node | string => k !== null));
     let phase: "loading" | "calibrating" | "recording" | "stopping" | "done" = "loading";
     let reader: FaceReader | null = null;
     let rec: SessionRecorder | null = null;
@@ -59,16 +72,26 @@ export function recordScreen(ctx: RecordCtx): Screen {
     let calib: Raw[] = [];
     let calibFrames = 0;
     let lastFaceAt = 0;
+    let lastFaces = 0;
+    let crashed = false;
     const samples: Sample[] = [];
     const marks: number[] = [];
+    let live: Moment[] = [];
     let tick = 0;
     let raf = 0;
 
-    const onFace = (at: number, shapes: Record<string, number> | null, loud: number) => {
+    const faceCheck = h("p", { class: "face-check", id: "face-check" }, "Looking for a face…");
+
+    const onFace = (at: number, shapes: Record<string, number> | null, loud: number, faces: number) => {
+      lastFaces = faces;
       if (phase === "calibrating") {
         calibFrames++;
-        faceCheck.className = `face-check ${shapes ? "yes" : "no"}`;
-        faceCheck.textContent = shapes ? "Face found" : "Can't see a face — move closer or face a light";
+        faceCheck.className = `face-check ${shapes ? (faces > 1 ? "warn" : "yes") : "no"}`;
+        faceCheck.textContent = !shapes
+          ? "Can't see a face — sit closer or face a light"
+          : faces > 1
+            ? "Two faces in view — Flinch follows the nearest one"
+            : "Face found";
         if (shapes) calib.push({ ...rawSignals(shapes), loud });
         return;
       }
@@ -85,7 +108,15 @@ export function recordScreen(ctx: RecordCtx): Screen {
       samples.push({ t, f: round(s.f), d: round(s.d), loud: round(s.loud), face: true });
     };
 
-    const faceCheck = h("p", { class: "face-check" }, "Looking for a face…");
+    const updateFaceChip = () => {
+      const lost = crashed || performance.timeOrigin + performance.now() - lastFaceAt > 1000;
+      faceChip.hidden = false;
+      faceChip.className = `chip ${crashed || lost || lastFaces > 1 ? "warn" : "ok"}`;
+      faceChip.replaceChildren(
+        icon(lost ? "alert" : "face"),
+        crashed ? "Face reader stopped — recording continues" : lost ? "Face lost" : lastFaces > 1 ? "2 faces — following the nearest" : "Face tracked",
+      );
+    };
 
     const calibrateNow = () => {
       phase = "calibrating";
@@ -94,11 +125,19 @@ export function recordScreen(ctx: RecordCtx): Screen {
       overlay.hidden = false;
       status.textContent = "Calibrating";
       const count = h("div", { class: "count mono", id: "countdown" }, String(CALIBRATION_SECONDS));
-      say(h("h2", {}, "Relax and look at the screen"), h("p", {}, "Flinch is learning your resting face. Just sit normally."), count, faceCheck);
+      const bar = h("i", {});
+      say(
+        h("h2", {}, "Relax and look at the game"),
+        h("p", {}, "Ten seconds to learn the tester's resting face. Sit normally — no need to stay perfectly still."),
+        count,
+        h("div", { class: "calib-bar" }, bar),
+        faceCheck,
+      );
       const t0 = performance.now();
       const timer = setInterval(() => {
         const left = CALIBRATION_SECONDS - (performance.now() - t0) / 1000;
         count.textContent = String(Math.max(0, Math.ceil(left)));
+        bar.style.width = `${Math.min(100, (1 - left / CALIBRATION_SECONDS) * 100)}%`;
         if (left > 0) return;
         clearInterval(timer);
         if (phase !== "calibrating") return;
@@ -106,9 +145,10 @@ export function recordScreen(ctx: RecordCtx): Screen {
           phase = "loading";
           status.textContent = "Calibration failed";
           say(
+            icon("alert", "big warn"),
             h("h2", {}, "Couldn't see a face"),
             h("p", { id: "calib-failed" }, "The camera didn't find the tester's face for most of the ten seconds. Sit a little closer, face a window or lamp, then try again."),
-            h("div", { class: "exports" },
+            h("div", { class: "row" },
               h("button", { class: "primary", id: "retry", onclick: calibrateNow }, "Try again"),
               h("button", { class: "ghost", onclick: () => show(setupScreen()) }, "Back to setup"),
             ),
@@ -122,38 +162,57 @@ export function recordScreen(ctx: RecordCtx): Screen {
     const startRecording = () => {
       scorer = new Scorer(calibrate(calib));
       rec = new SessionRecorder(ctx.game, ctx.cam);
+      rec.onError = () => finish();
       rec.start();
       phase = "recording";
       overlay.hidden = true;
       stopBtn.disabled = false;
       markBtn.disabled = false;
       status.replaceChildren(h("i", { class: "rec-dot" }), "Recording");
+      let lastLive = 0;
       tick = window.setInterval(() => {
-        clock.textContent = timecode(rec!.elapsed());
-        faceLost.hidden = performance.timeOrigin + performance.now() - lastFaceAt < 1000;
+        const t = rec!.elapsed();
+        clock.textContent = timecode(t);
+        updateFaceChip();
+        if (performance.now() - lastLive > 1000) {
+          lastLive = performance.now();
+          live = findMoments(samples, marks);
+          const n = live.filter((m) => m.kind !== "mark").length;
+          liveCount.textContent = n ? `${n} possible reaction${n === 1 ? "" : "s"}` : "";
+        }
+        if (t > LONG_SESSION_S) {
+          notice.hidden = false;
+          notice.replaceChildren(icon("alert"), "Long session — stop within a few minutes to keep it safe");
+        }
       }, 250);
       const draw = () => {
         const t = rec!.elapsed();
-        drawTimeline(strip, samples, { from: Math.max(0, t - LIVE_WINDOW), to: Math.max(LIVE_WINDOW, t), threshold: THRESHOLD });
+        drawTimeline(strip, samples, { from: Math.max(0, t - LIVE_WINDOW), to: Math.max(LIVE_WINDOW, t), threshold: THRESHOLD, moments: live });
         raf = requestAnimationFrame(draw);
       };
       raf = requestAnimationFrame(draw);
     };
 
+    const step = (label: string, id: string) => h("li", { id, class: "pending" }, icon("check"), label);
     const finish = async () => {
       if (phase !== "recording" || !rec) return;
       phase = "stopping";
       clearInterval(tick);
       cancelAnimationFrame(raf);
       stopBtn.disabled = markBtn.disabled = true;
-      status.textContent = "Finding moments…";
+      status.textContent = "Saving…";
+      const steps = [step("Stopping the recording", "st-stop"), step("Finding possible reactions", "st-find"), step("Saving on this computer", "st-save")];
+      overlay.hidden = false;
+      say(h("h2", {}, "Wrapping up"), h("ol", { class: "steps-done" }, ...steps));
+      const done = (i: number) => steps[i].classList.replace("pending", "done");
       reader?.stop();
       const recording = await rec.stop();
       stopStream(ctx.game);
       stopStream(ctx.cam);
+      done(0);
       const moments = findMoments(samples, marks);
       await addThumbs(moments, recording);
-      phase = "done";
+      done(1);
       const session: Session = {
         id: uid(),
         tester: ctx.tester,
@@ -166,42 +225,68 @@ export function recordScreen(ctx: RecordCtx): Screen {
       };
       const videos = { game: recording.game, face: recording.face };
       const saved = await saveSession(session, videos).then(() => true, () => false);
-      show(reviewScreen(session, videos, { unsaved: !saved }), `#/review/${session.id}`);
+      done(2);
+      phase = "done";
+      show(reviewScreen(session, videos, { unsaved: !saved, fresh: true }), `#/review/${session.id}`);
     };
     stopBtn.onclick = finish;
     const mark = () => {
       if (phase !== "recording" || !rec) return;
       marks.push(rec.elapsed());
-      markBtn.textContent = `Marked ${marks.length} (M)`;
+      live = findMoments(samples, marks);
+      markBtn.classList.add("flash");
+      setTimeout(() => markBtn.classList.remove("flash"), 300);
     };
     markBtn.onclick = mark;
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "m" && !e.repeat && !(e.target instanceof HTMLInputElement)) mark();
     };
     addEventListener("keydown", onKey);
-    // Stopping the share from Chrome's own bar ends the session instead of losing it.
+    // A refresh or closed tab mid-session would lose the recording: ask first.
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (phase === "calibrating" || phase === "recording" || phase === "stopping") e.preventDefault();
+    };
+    addEventListener("beforeunload", onUnload);
+    // Stopping the share from Chrome's own bar, or a camera being unplugged, ends the session instead of losing it.
     ctx.game.getVideoTracks()[0]?.addEventListener("ended", finish);
     ctx.cam.getVideoTracks()[0]?.addEventListener("ended", finish);
 
-    say(h("h2", {}, "Loading the face reader…"), h("p", {}, "This takes a few seconds the first time."));
-    FaceReader.start(ctx.cam).then(
-      (r) => {
-        reader = r;
-        r.onFace = onFace;
-        if (phase === "loading") calibrateNow();
-      },
-      (err) => {
-        status.textContent = "Face reader failed";
-        say(
-          h("h2", {}, "The face reader couldn't start"),
-          h("p", { id: "face-error" }, String(err?.message ?? err)),
-          h("button", { class: "primary", onclick: () => show(setupScreen()) }, "Back to setup"),
-        );
-      },
-    );
+    const startReader = () => {
+      phase = "loading";
+      status.textContent = "Getting ready";
+      say(h("div", { class: "spinner" }), h("h2", {}, "Loading the face reader…"), h("p", {}, "A few seconds the first time. It runs on this computer."));
+      FaceReader.start(ctx.cam).then(
+        (r) => {
+          reader = r;
+          r.onFace = onFace;
+          r.onCrash = () => {
+            crashed = true;
+            if (phase === "calibrating") {
+              phase = "loading";
+              say(icon("alert", "big warn"), h("h2", {}, "The face reader stopped"), h("button", { class: "primary", onclick: startReader }, "Restart it"));
+            }
+          };
+          if (phase === "loading") calibrateNow();
+        },
+        (err) => {
+          status.textContent = "Face reader failed";
+          say(
+            icon("alert", "big warn"),
+            h("h2", {}, "The face reader couldn't start"),
+            h("p", { id: "face-error" }, `Flinch loads its face model from this site. Check the page is still being served, then try again. (${String(err?.message ?? err).slice(0, 160)})`),
+            h("div", { class: "row" },
+              h("button", { class: "primary", id: "retry-reader", onclick: startReader }, "Try again"),
+              h("button", { class: "ghost", onclick: () => show(setupScreen()) }, "Back to setup"),
+            ),
+          );
+        },
+      );
+    };
+    startReader();
 
     return () => {
       removeEventListener("keydown", onKey);
+      removeEventListener("beforeunload", onUnload);
       clearInterval(tick);
       cancelAnimationFrame(raf);
       reader?.stop();
