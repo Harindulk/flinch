@@ -170,6 +170,19 @@ await test("pins a smile and a manual mark, and clicking a pin replays it", asyn
   const md = readFileSync(`${OUT}notes.md`, "utf8");
   assert(md.includes("| Possible delight |") && md.includes("| Your mark |"), `notes file:\n${md}`);
 
+  const recDownloads = [];
+  page.on("download", (d) => recDownloads.push(d));
+  await page.click("#download-recording");
+  await page.waitForTimeout(1500);
+  page.removeAllListeners("download");
+  assert(recDownloads.length === 2, `expected game + face files, got ${recDownloads.length}`);
+  for (const d of recDownloads) {
+    const path = `${OUT}${d.suggestedFilename()}`;
+    await d.saveAs(path);
+    const st = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type,codec_name", "-of", "json", path])).streams;
+    assert(d.suggestedFilename().endsWith(".webm") && st.some((x) => x.codec_type === "video" && /vp8|vp9/.test(x.codec_name)), `${d.suggestedFilename()}: ${JSON.stringify(st)}`);
+  }
+
   const [reel] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }), page.click("#make-reel")]);
   const reelPath = `${OUT}reel.${reel.suggestedFilename().split(".").pop()}`;
   await reel.saveAs(reelPath);

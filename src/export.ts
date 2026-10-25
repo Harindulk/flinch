@@ -1,7 +1,7 @@
 import { h } from "./dom";
 import { timecode } from "./format";
 import { THRESHOLD } from "./moments";
-import { KIND_LABEL, MEASURE_NOTE } from "./labels";
+import { KIND_LABEL, MEASURE_NOTE, STRENGTH_TIP } from "./labels";
 import { loadVideo, seekTo } from "./player";
 import { paintFrame } from "./thumbs";
 import { drawTimeline } from "./timeline";
@@ -32,7 +32,7 @@ export function notesMarkdown(s: Session): string {
   }
   lines.push(
     "",
-    `${MEASURE_NOTE} "Expression change" is how many resting spreads above the tester's resting face the change went. Times are from the start of the recording.`,
+    `${MEASURE_NOTE} Expression change: ${STRENGTH_TIP.charAt(0).toLowerCase()}${STRENGTH_TIP.slice(1)} Times are from the start of the recording.`,
     "",
   );
   return lines.join("\n");
@@ -120,7 +120,7 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
     await card("Flinch", `${s.tester} playing ${s.build} · ${kept.length} moment${kept.length === 1 ? "" : "s"}`, "#ecebe6", 1500);
     for (const [i, m] of kept.entries()) {
       onProgress(i, kept.length);
-      await card(`${timecode(m.t)} · ${KIND_LABEL[m.kind]}`, m.note || (m.kind === "mark" ? "Marked during play" : `Expression change ${m.strength.toFixed(1)}× the tester's resting spread`), COLOR[m.kind], 1000);
+      await card(`${timecode(m.t)} · ${KIND_LABEL[m.kind]}`, m.note || (m.kind === "mark" ? "Marked during play" : `Expression change ${m.strength.toFixed(1)}× the tester's normal variation`), COLOR[m.kind], 1000);
       await clip(m);
     }
     onProgress(kept.length, kept.length);

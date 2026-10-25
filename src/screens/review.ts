@@ -149,7 +149,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
         updateSession(session).catch(() => {});
       }, 300);
     };
-    const fileBase = `flinch-${slug(session.tester)}-${slug(session.build)}-${new Date(session.createdAt).toISOString().slice(0, 10)}`;
+    const fileBase = `flinch-${slug(session.tester)}-${slug(session.build)}-${new Date(session.createdAt).toLocaleDateString("en-CA")}`; // en-CA gives local YYYY-MM-DD
     const ext = session.mimeType.includes("mp4") ? "mp4" : "webm";
     const downloadRecording = () => {
       download(videos.game, `${fileBase}-game.${ext}`);
