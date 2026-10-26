@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Nothing loads from another origin. wasm-unsafe-eval: MediaPipe compiles WebAssembly. Inline styles: style="" attributes set by the screens. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Flinch: the playtest recorder that pins player reactions</title>
     <meta name="description" content="Record your game and your tester’s face in one Chrome tab. Flinch pins each moment their expression changed, so you can replay and fix it. Free, no uploads." />

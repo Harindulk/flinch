@@ -91,7 +91,8 @@ async function launch({ camera = "face", denyCamera = false, init = null, block 
   const browser = await chromium.launch({ args, ignoreDefaultArgs });
   browsers.push(browser);
   const [vw, vh] = (process.env.E2E_VIEWPORT ?? "1440x900").split("x").map(Number); // e.g. E2E_VIEWPORT=1280x720
-  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: vw, height: vh } });
+  // AXE injects its script inline, which the page CSP would block.
+  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: vw, height: vh }, bypassCSP: !!process.env.AXE });
   // Headless Chromium can't show a real "Block" choice, so make getUserMedia fail the way a blocked camera does.
   if (denyCamera) await context.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));
@@ -141,7 +142,7 @@ await test("records game and face and plays them back", async () => {
   await page.waitForSelector("#countdown", { timeout: 30000 });
   await page.waitForSelector(".face-check.yes", { timeout: 10000 });
   await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(6000); // over 5 s, so Review gives the full empty state, not "too short"
   await page.screenshot({ path: `${OUT}record.png` });
   await page.click("#stop");
   await page.waitForSelector("#review[data-ready]", { timeout: 20000 }).catch(async (e) => {
@@ -153,8 +154,9 @@ await test("records game and face and plays them back", async () => {
   const d = await page.$$eval(".stage video", (vs) => vs.map((v) => v.duration));
   assert(d.length === 2 && d.every((x) => Number.isFinite(x) && x > 2), `video durations ${d}`);
   const faces = Number(await page.getAttribute("#review", "data-faces"));
-  assert(faces > 30, `expected face samples during 4 s of recording, got ${faces}`);
+  assert(faces > 30, `expected face samples during 6 s of recording, got ${faces}`);
   assert(await page.isVisible("#no-moments"), "a calm session should say there were no big reactions");
+  assert(/pin line/.test(await page.textContent("#no-moments")), "the empty state should explain that nothing crossed the pin line");
   await page.screenshot({ path: `${OUT}review.png` });
 });
 
@@ -232,7 +234,7 @@ await test("keeps playtests and notes after a refresh, and deletes them", async 
   await page.click("#stop");
   await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
   await page.fill(".moment.delight textarea", "Grinned at the drift jump");
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => /^Saved /.test(document.querySelector("#save-state")?.textContent ?? ""), null, { timeout: 5000 });
   assert(page.url().includes("#/review/"), `url ${page.url()}`);
   await page.reload();
   await page.waitForSelector("#review[data-ready]", { timeout: 20000 });
@@ -422,6 +424,76 @@ await test("keeps the recording reachable when browser storage is blocked", asyn
   await page.click("#unsaved button");
   await page.waitForTimeout(1200);
   assert(downloads.length === 2, `expected 2 downloads from the banner, got ${downloads.length}`);
+});
+
+// Keeps every camera/screen stream so a test can end its track the way Chrome's "Stop sharing" or an unplugged camera does.
+const keepStreams = () => {
+  window.__streams = [];
+  for (const k of ["getUserMedia", "getDisplayMedia"]) {
+    const orig = navigator.mediaDevices[k].bind(navigator.mediaDevices);
+    navigator.mediaDevices[k] = async (c) => { const s = await orig(c); s.__kind = k; window.__streams.push(s); return s; };
+  }
+};
+// track.stop() alone fires no "ended" (only the browser ending it does), so fire it as Chrome would.
+const endTrack = (page, kind) => page.evaluate((k) => {
+  const t = window.__streams.filter((s) => s.__kind === k).at(-1).getVideoTracks()[0];
+  t.stop();
+  t.dispatchEvent(new Event("ended"));
+}, kind);
+const liveTracks = (page) => page.evaluate(() => window.__streams.flatMap((s) => s.getTracks()).filter((t) => t.readyState === "live").length);
+
+await test("saves what was recorded when screen sharing stops mid-session", async () => {
+  const page = await launch({ init: keepStreams });
+  await startPlaytest(page, { tester: "Sharestop", build: "Save test" });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(3000);
+  await endTrack(page, "getDisplayMedia");
+  await page.waitForSelector("#end-reason", { timeout: 5000 });
+  assert(/Window sharing stopped/.test(await page.textContent("#end-reason")), `reason: ${await page.textContent("#end-reason")}`);
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  assert(!(await page.$("#unsaved")), "the session should have been saved");
+  const d = await page.$eval(".stage video.game", (v) => v.duration);
+  assert(Number.isFinite(d) && d > 1.5, `game recording should keep the ~3 s before the share stopped, got ${d}`);
+  assert((await liveTracks(page)) === 0, `tracks still live: ${await liveTracks(page)}`);
+});
+
+await test("stops cleanly when the camera disconnects during calibration", async () => {
+  const page = await launch({ init: keepStreams });
+  await startPlaytest(page);
+  await page.waitForSelector("#countdown", { timeout: 30000 });
+  await endTrack(page, "getUserMedia");
+  await page.waitForSelector("#session-ended", { timeout: 5000 });
+  assert(/camera stopped/i.test(await page.textContent("#session-ended")), `message: ${await page.textContent("#session-ended")}`);
+  assert((await liveTracks(page)) === 0, `tracks still live: ${await liveTracks(page)}`);
+  await page.waitForTimeout(12000); // past the calibration countdown: it must not start recording dead streams
+  assert(await page.isVisible("#session-ended"), "the ended message should stay up");
+  assert(!(await page.$("#stop:not([disabled])")), "recording started after the camera disconnected");
+  await page.click("button:has-text('Back to setup')");
+  await page.waitForSelector("#cam-tile-btn");
+});
+
+await test("keeps the recording reachable when browser storage is full", async () => {
+  const page = await launch({ init: () => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...a) {
+      if (this.name === "videos") throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      return put.apply(this, a);
+    };
+  } });
+  await startPlaytest(page, { tester: "Quota", build: "Full disk" });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await page.click("#stop");
+  await page.waitForSelector("#unsaved", { timeout: 20000 });
+  const downloads = [];
+  page.on("download", (d) => downloads.push(d));
+  await page.click("#unsaved button");
+  await page.waitForTimeout(1200);
+  assert(downloads.length === 2, `expected 2 downloads from the banner, got ${downloads.length}`);
+  await page.click("button:has-text('Playtests')");
+  await page.waitForSelector("#new-playtest");
+  await page.waitForTimeout(500);
+  assert(!(await page.$(".session-row")), "a half-saved playtest (record without videos) showed up on Home");
 });
 
 await test("keeps a reaction that happens while the page stutters", async () => {
