@@ -455,6 +455,22 @@ if (process.env.SOAK_MIN) await test("soak: memory over a long recording", async
   console.log(`  stop→review ${summary.stopToReviewS}s; recordings ${summary.recordingMb} MB (${summary.mbPerMin} MB/min)`);
 });
 
+await test("saves the playtest even when gap filling fails", async () => {
+  const page = await launch();
+  await startPlaytest(page, { tester: "Gapfail", build: "Save test" });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => { const t = performance.now(); while (performance.now() - t < 1500) {} }); // makes a gap
+  await page.waitForTimeout(1000);
+  await page.context().route("**/models/face_landmarker.task", (r) => r.abort()); // the gap filler can't load
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  assert(!(await page.$("#unsaved")), "the session should still have been saved");
+  await page.click("button:has-text('Playtests')");
+  await page.waitForSelector(".session-row");
+  assert((await page.textContent(".session-row .title")).includes("Gapfail"), "saved session not listed");
+});
+
 await test("asks to retry calibration when no face is visible", async () => {
   const page = await launch({ camera: "pattern" });
   await startPlaytest(page);

@@ -4,8 +4,7 @@ import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import { USED } from "./signals";
 
 type Init =
-  | { base: string; tracks?: false; backfill?: false; video: ReadableStream<VideoFrame>; audio?: ReadableStream<AudioData> }
-  | { base: string; tracks: true; backfill?: false; video: MediaStreamTrack; audio?: MediaStreamTrack }
+  | { base: string; backfill?: false; video: ReadableStream<VideoFrame>; audio?: ReadableStream<AudioData> }
   | { base: string; backfill: true }
   | { frame: ImageBitmap; at: number };
 
@@ -13,14 +12,12 @@ const post = (m: unknown) => (self as unknown as DedicatedWorkerGlobalScope).pos
 const now = () => performance.timeOrigin + performance.now();
 const FRAME_GAP_MS = 60; // about 15 face reads a second
 let running = true;
-let owned: MediaStreamTrack[] = [];
 let base = "";
 let landmarker: FaceLandmarker | null = null;
 
 self.onmessage = async (e: MessageEvent<Init | "stop">) => {
   if (e.data === "stop") {
     running = false;
-    owned.forEach((t) => t.stop());
     return;
   }
   const init = e.data;
@@ -36,27 +33,13 @@ self.onmessage = async (e: MessageEvent<Init | "stop">) => {
     if (landmarker) post({ type: "ready" });
     return;
   }
-  if (init.tracks) {
-    owned = init.audio ? [init.video, init.audio] : [init.video];
-    // This worker can't read tracks itself: give them back and ask for streams instead.
-    if (typeof MediaStreamTrackProcessor === "undefined") {
-      owned.forEach((t) => t.stop());
-      owned = [];
-      post({ type: "need-streams" });
-      return;
-    }
-  }
   if (!landmarker) {
     base = init.base;
     landmarker = await loadModel();
     if (!landmarker) return;
     post({ type: "ready" });
   }
-  const video = init.tracks ? new MediaStreamTrackProcessor({ track: init.video, maxBufferSize: 2 }).readable : init.video;
-  const audio = init.tracks
-    ? init.audio && (new MediaStreamTrackProcessor({ track: init.audio }).readable as unknown as ReadableStream<AudioData>)
-    : init.audio;
-  await readFrames(landmarker, video, audio);
+  await readFrames(landmarker, init.video, init.audio);
 };
 
 async function loadModel(): Promise<FaceLandmarker | null> {

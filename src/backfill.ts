@@ -53,12 +53,12 @@ export async function fillGaps(samples: Sample[], face: Blob, duration: number, 
       }
     }
   } finally {
+    samples.sort((a, b) => a.t - b.t); // also after a failed fill: everything downstream assumes time order
     reader.stop();
     URL.revokeObjectURL(video.src);
     video.removeAttribute("src");
     video.load();
   }
-  samples.sort((a, b) => a.t - b.t);
   return done;
 }
 

@@ -45,11 +45,6 @@ export class SessionRecorder {
     return this.startedAt ? (nowMs() - this.startedAt) / 1000 : 0;
   }
 
-  /** Rough bytes recorded so far, to warn before memory gets tight. */
-  bytes(): number {
-    return this.chunks.flat().reduce((n, b) => n + b.size, 0);
-  }
-
   async stop(): Promise<Recording> {
     const duration = this.elapsed();
     await Promise.all(

@@ -71,6 +71,12 @@ export function setupScreen(): Screen {
       try {
         stopStream(cam);
         cam = await openCamera();
+        cam.getVideoTracks()[0].addEventListener("ended", () => {
+          cam = null;
+          camTile.btn.disabled = false;
+          camTile.btn.replaceChildren(icon("camera"), "Turn on camera & mic");
+          attach(camTile, null, new Error("The camera disconnected. Plug it back in and turn it on again."));
+        });
         camTile.btn.replaceChildren(icon("check"), cam.getAudioTracks().length ? "Camera and mic on" : "Camera on (no mic found)");
         camTile.btn.disabled = true;
         attach(camTile, cam);
