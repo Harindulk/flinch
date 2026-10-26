@@ -1,8 +1,8 @@
 import { download, h } from "../dom";
 import { slug, timecode } from "../format";
 import { icon } from "../icons";
-import { KIND_LABEL, MEASURE_NOTE, SIGNAL_LABEL, STRENGTH_TIP, strengthText } from "../labels";
-import { THRESHOLD } from "../moments";
+import { KIND_LABEL, MEASURE_NOTE, SIGNAL_LABEL, STRENGTH_TIP, strengthText, whyPinned } from "../labels";
+import { MIN_SECONDS, THRESHOLD } from "../moments";
 import { show, type Screen } from "../nav";
 import { Player } from "../player";
 import { drawTimeline, timeAt } from "../timeline";
@@ -11,6 +11,7 @@ import { keptMoments, makeReel, notesMarkdown } from "../export";
 import { listSessions, updateSession } from "../store";
 import { compareText, stats } from "../compare";
 import { homeScreen } from "./home";
+import "../review.css";
 
 const LEAD_IN = 3; // jump to a little before the moment, so you see what led to it
 const PIN_HIT_PX = 10;
@@ -36,7 +37,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     const span = () => Math.max(session.duration, ghost?.duration ?? 0);
     const redraw = () => {
       clock.textContent = `${timecode(player.time)} / ${timecode(session.duration)}`;
-      drawTimeline(timeline, session.samples, { from: 0, to: span(), moments: session.moments, playhead: player.time, selected, threshold: THRESHOLD, hover: hoverT ?? undefined, ghost: ghost?.samples });
+      drawTimeline(timeline, session.samples, { from: 0, to: span(), moments: session.moments, playhead: player.time, selected, threshold: THRESHOLD, thresholdLabel: "pin line", hover: hoverT ?? undefined, ghost: ghost?.samples });
     };
     const loop = () => {
       redraw();
@@ -60,7 +61,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     const select = (m: Moment, play = true) => {
       selected = m.id;
       player.seek(m.t - LEAD_IN);
-      if (play) player.game.play().catch(() => {});
+      if (play && player.ready && !player.gameFailed) player.game.play().catch(() => {});
       for (const row of list.querySelectorAll<HTMLElement>(".moment")) row.classList.toggle("selected", row.dataset.id === m.id);
       list.querySelector<HTMLElement>(`[data-id="${m.id}"]`)?.scrollIntoView({ block: "nearest" });
       redraw();
@@ -90,9 +91,12 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
       hoverT = pin ? pin.t : t;
       timeline.style.cursor = pin ? "pointer" : "col-resize";
       tip.hidden = false;
-      tip.textContent = pin ? `${timecode(pin.t)} · ${KIND_LABEL[pin.kind]} — click to replay` : timecode(t);
+      tip.textContent = pin
+        ? `${timecode(pin.t)} · ${KIND_LABEL[pin.kind]}${pin.kind === "mark" ? "" : ` · ${pin.strength.toFixed(1)}×`}${pin.dismissed ? " (dismissed)" : ""} · click to replay`
+        : `${timecode(t)} · click to jump here`;
       const r = timeline.getBoundingClientRect();
-      tip.style.left = `${Math.min(Math.max(e.clientX - r.left, 60), r.width - 60)}px`;
+      const half = Math.min(tip.offsetWidth / 2 + 4, r.width / 2);
+      tip.style.left = `${Math.min(Math.max(e.clientX - r.left, half), r.width - half)}px`;
       redraw();
     };
     timeline.onmouseleave = () => {
@@ -103,20 +107,29 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
 
     const row = (m: Moment) => {
       const note = h("textarea", { placeholder: "What happened here? e.g. jump too far", value: m.note, rows: 1, ariaLabel: `Note for ${timecode(m.t)}` });
-      const dismiss = h("button", { class: "ghost small" }, m.dismissed ? "Restore" : "Not a reaction");
+      const dismissTitle = "Wrong pin? Dismiss it: it stays in this list, faded, but leaves the fix list and the reel.";
+      const dismiss = h("button", { class: "ghost small", title: dismissTitle, ariaLabel: `Dismiss the pin at ${timecode(m.t)}` }, "Dismiss");
+      const setDismissLabel = () => {
+        dismiss.textContent = m.dismissed ? "Restore" : "Dismiss";
+        dismiss.title = m.dismissed ? "Put this pin back in the fix list and the reel." : dismissTitle;
+        dismiss.ariaLabel = `${m.dismissed ? "Restore" : "Dismiss"} the pin at ${timecode(m.t)}`;
+      };
+      setDismissLabel();
       const el = h("article", { class: `moment ${m.kind}${m.dismissed ? " dismissed" : ""}`, dataset: { id: m.id, kind: m.kind } },
-        m.thumb ? h("img", { src: m.thumb, alt: `Game and face at ${timecode(m.t)}` }) : h("div", { class: "thumb-missing" }),
+        m.thumb ? h("img", { src: m.thumb, alt: `Game and face at ${timecode(m.t)}` }) : h("div", { class: "thumb-missing", title: "No frame could be read from the recording here" }, "No frame"),
         h("div", { class: "body" },
           h("div", { class: "head" },
             h("span", { class: "mono time" }, timecode(m.t)),
             h("span", { class: "kind" }, KIND_LABEL[m.kind]),
             m === strongest ? h("span", { class: "badge" }, "Strongest") : null,
+            h("span", { class: "dismissed-tag" }, "Dismissed"),
           ),
           m.kind === "mark"
-            ? h("div", { class: "meta" }, "Marked during play")
+            ? h("div", { class: "meta" }, whyPinned(m.kind, THRESHOLD, MIN_SECONDS))
             : h("div", {},
                 h("div", { class: "strength", title: STRENGTH_TIP }, h("i", { style: `width:${Math.min(100, (m.strength / 10) * 100)}%` })),
                 h("div", { class: "meta", title: STRENGTH_TIP }, strengthText(m.strength)),
+                h("div", { class: "why" }, whyPinned(m.kind, THRESHOLD, MIN_SECONDS)),
               ),
         ),
         note,
@@ -135,26 +148,47 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
         m.note = note.value;
         onChange();
       };
+      note.onblur = () => saveTimer && save();
       dismiss.onclick = () => {
         m.dismissed = !m.dismissed;
         el.classList.toggle("dismissed", m.dismissed);
-        dismiss.textContent = m.dismissed ? "Restore" : "Not a reaction";
+        setDismissLabel();
         onChange();
         redraw();
       };
       return el;
     };
 
+    // Notes and dismissals save to this browser a moment after each change; the status line says whether that worked.
+    const saveState = h("p", { class: "save-state", id: "save-state", role: "status" },
+      opts.unsaved ? "This playtest isn't stored in this browser, so notes won't be kept. Download Notes (.md) before you leave." : "Notes save on this device as you type.");
+    if (opts.unsaved) saveState.classList.add("error");
     let saveTimer = 0;
+    const save = () => {
+      clearTimeout(saveTimer);
+      saveTimer = 0;
+      if (opts.unsaved) return; // a session record without its videos would show up as a broken playtest
+      updateSession(session).then(
+        () => {
+          saveState.classList.remove("error");
+          saveState.textContent = `Saved ${new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}.`;
+        },
+        () => {
+          saveState.classList.add("error");
+          saveState.textContent = "Couldn't save your notes in this browser. Download Notes (.md) so they aren't lost.";
+        },
+      );
+    };
     const onChange = () => {
       clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(() => {
-        saveTimer = 0;
-        updateSession(session).catch(() => {});
-      }, 300);
+      if (!opts.unsaved) saveState.textContent = "Saving…";
+      saveTimer = window.setTimeout(save, 300);
     };
+    const onPageHide = () => saveTimer && save();
+    addEventListener("pagehide", onPageHide);
     const fileBase = `flinch-${slug(session.tester)}-${slug(session.build)}-${new Date(session.createdAt).toLocaleDateString("en-CA")}`; // en-CA gives local YYYY-MM-DD
     const ext = session.mimeType.includes("mp4") ? "mp4" : "webm";
+    const downloadNotes = () => download(new Blob([notesMarkdown(session)], { type: "text/markdown" }), `${fileBase}-notes.md`);
     const downloadRecording = () => {
       download(videos.game, `${fileBase}-game.${ext}`);
       setTimeout(() => download(videos.face, `${fileBase}-face.${ext}`), 400);
@@ -183,7 +217,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     };
     const exports = h("div", { class: "exports" },
       h("button", { class: "secondary", id: "download-notes", title: "A Markdown fix list of the kept moments",
-        onclick: () => download(new Blob([notesMarkdown(session)], { type: "text/markdown" }), `${fileBase}-notes.md`) }, icon("notes"), "Notes (.md)"),
+        onclick: downloadNotes }, icon("notes"), "Notes (.md)"),
       h("button", { class: "secondary", id: "download-recording", title: `Two ${ext.toUpperCase()} files: game and face` }, icon("download"), "Recording"),
       reelBtn,
     );
@@ -203,24 +237,48 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
 
     const renderList = () => {
       const auto = session.moments.filter((m) => m.kind !== "mark");
+      const marks = session.moments.length - auto.length;
+      const guide = h("details", { class: "guide", open: !!opts.fresh && session.moments.length > 0 },
+        h("summary", {}, "How to read and use these pins"),
+        h("ul", {},
+          h("li", {}, h("b", { class: "c-frus" }, "Red"), ": possible frustration. Tension in the brows and lips rose well above this tester's resting face."),
+          h("li", {}, h("b", { class: "c-joy" }, "Green"), ": possible delight. A smile rose well above their resting face."),
+          h("li", {}, h("b", { class: "c-mark" }, "Amber"), ": your mark, from pressing M during play."),
+          h("li", {}, "Slight, Clear or Strong, and the ×: how far the expression moved, in multiples of the tester's normal variation at rest. A pin needs ", `${THRESHOLD}× for ${MIN_SECONDS} s`, " (the dashed pin line). A laugh or groan heard at the same moment raises it by 1.5×."),
+          h("li", {}, "Click a pin or a card to replay from 3 s before. ", h("kbd", {}, "N"), " ", h("kbd", {}, "P"), " jump between pins, ", h("kbd", {}, "←"), " ", h("kbd", {}, "→"), " move 5 s."),
+          h("li", {}, "Write what happened in the note. If a pin isn't a real reaction (a sneeze, talking), press Dismiss."),
+        ),
+        h("p", { class: "dim" }, "A pin says where to look, not what the tester felt."),
+      );
+      const empty = session.duration < 5
+        ? "This session was too short to find reactions. Record at least a minute of play."
+        : `No pins from the face this time: the tester's expression stayed close to resting and never crossed the pin line. That can just mean a smooth run.${marks ? " Your own marks are below." : ""}`;
       list.replaceChildren(
-        h("h2", { class: "label" }, `Moments · ${session.moments.length}`),
-        ...(auto.length ? [] : [h("p", { class: "empty", id: "no-moments" },
-          session.duration < 5
-            ? "This session was too short to find reactions. Record at least a minute of play."
-            : "No clear reactions this time: the tester's face stayed close to resting. The timeline still shows every change, and your own marks appear here.")]),
+        h("div", { class: "moments-head" }, h("h2", { class: "label" }, `Moments · ${session.moments.length}`), saveState),
+        guide,
+        ...(auto.length ? [] : [h("div", { class: "empty", id: "no-moments" },
+          h("p", {}, empty),
+          h("p", {}, "Next time: press ", h("kbd", {}, "M"), " during play to pin a moment yourself, and check the face is evenly lit from the front and stays in view."))]),
         ...session.moments.map(row),
+        h("div", { class: "next-step" },
+          h("p", {}, h("b", {}, "Done reviewing? "), session.moments.length
+            ? "Download the fix list: every kept pin with its time and your note, as Markdown for your tracker."
+            : "The fix list still records that nothing was pinned."),
+          h("button", { class: "secondary", onclick: downloadNotes }, icon("notes"), "Download fix list (.md)"),
+        ),
       );
     };
     renderList();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
-      if (e.key === " " && !(e.target instanceof HTMLButtonElement)) {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // leave Cmd+P and friends to the browser
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (key === " " && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLElement && e.target.tagName === "SUMMARY")) {
         e.preventDefault();
         player.toggle();
-      } else if (e.key === "n") step(1);
-      else if (e.key === "p") step(-1);
+      } else if (key === "n") step(1);
+      else if (key === "p") step(-1);
       else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         player.seek(player.time + (e.key === "ArrowRight" ? 5 : -5));
@@ -298,16 +356,15 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     redraw();
     void player.load(videos.game, videos.face).then(() => {
       root.querySelector("#review")?.setAttribute("data-ready", "1");
+      if (player.gameFailed) playBtn.disabled = prevBtn.disabled = nextBtn.disabled = true;
       // Open on the strongest reaction, paused just before it, so the first thing on screen is the moment that matters.
       if (strongest) select(strongest, false);
       else redraw();
     });
 
     return () => {
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        updateSession(session).catch(() => {});
-      }
+      if (saveTimer) save();
+      removeEventListener("pagehide", onPageHide);
       cancelAnimationFrame(raf);
       removeEventListener("keydown", onKey);
       removeEventListener("resize", redraw);

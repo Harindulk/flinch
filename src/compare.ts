@@ -3,6 +3,7 @@
  * shortcut: sessions are lined up by time from the start of recording; aligning by game events
  * (level start, death) would need markers sent from the game.
  */
+import { timecode } from "./format";
 import { KIND_LABEL } from "./labels";
 import type { Session } from "./types";
 
@@ -33,9 +34,14 @@ export function compareText(now: Stats, before: Stats, beforeName: string): { no
   const df = now.frustrations - before.frustrations;
   const dp = now.peakF - before.peakF;
   let verdict: string;
-  if (df < 0 && dp <= 0.5) verdict = `Fewer frustration pins than ${beforeName}, and no stronger.`;
-  else if (df > 0 || dp > 1.5) verdict = `More or stronger frustration than ${beforeName}. Worth a look before shipping.`;
-  else verdict = `About the same frustration as ${beforeName}.`;
-  if (now.delights > before.delights) verdict += " More delight too.";
+  if (!now.frustrations && !before.frustrations) verdict = `No possible frustration pinned in either this playtest or ${beforeName}.`;
+  else if (df < 0) verdict = dp <= 0.5 ? `Fewer frustration pins than ${beforeName}, and no stronger.` : `Fewer frustration pins than ${beforeName}, but the strongest change was bigger. Check it.`;
+  else if (df > 0 || dp > 1.5) verdict = `More or stronger possible frustration than ${beforeName}. Worth a look before shipping.`;
+  else verdict = `About the same possible frustration as ${beforeName}.`;
+  if (now.delights > before.delights) verdict += " More possible delight too.";
+  else if (now.delights < before.delights) verdict += " Less possible delight than before.";
+  // Pin counts only compare fairly between sessions of similar length.
+  const [lo, hi] = [now.duration, before.duration].sort((a, b) => a - b);
+  if (lo > 0 && hi / lo > 1.5) verdict += ` This playtest was ${now.duration > before.duration ? "longer" : "shorter"} (${timecode(now.duration)} vs ${timecode(before.duration)}), so counts are not like for like.`;
   return { now: line(now), before: line(before), verdict };
 }

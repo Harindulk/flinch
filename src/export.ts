@@ -13,11 +13,16 @@ export const REEL_AFTER = 3;
 
 export const keptMoments = (s: Session) => s.moments.filter((m) => !m.dismissed);
 
+/** The container a recorder really wrote ("video/mp4" or "video/webm"), from its own mimeType. Pure: unit-tested. */
+export const recordedType = (actual: string, asked?: string) =>
+  (actual || asked || "").includes("mp4") ? "video/mp4" : "video/webm";
+
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ").trim();
 
 /** The fix list: kept moments in time order, as a Markdown table. Pure: unit-tested. */
 export function notesMarkdown(s: Session): string {
   const kept = keptMoments(s);
+  const dismissed = s.moments.length - kept.length;
   const when = new Date(s.createdAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
   const lines = [
     `# Flinch playtest: ${s.tester} · ${s.build}`,
@@ -30,6 +35,7 @@ export function notesMarkdown(s: Session): string {
     lines.push("| Time | Moment | Expression change | Note |", "|---|---|---|---|");
     for (const m of kept) lines.push(`| ${timecode(m.t)} | ${KIND_LABEL[m.kind]} | ${m.kind === "mark" ? "—" : `${m.strength.toFixed(1)}×`} | ${cell(m.note) || " "} |`);
   }
+  if (dismissed) lines.push("", `${dismissed} pin${dismissed === 1 ? "" : "s"} dismissed as "not a reaction" and left out.`);
   lines.push(
     "",
     `${MEASURE_NOTE} Expression change: ${STRENGTH_TIP.charAt(0).toLowerCase()}${STRENGTH_TIP.slice(1)} Times are from the start of the recording.`,
@@ -53,17 +59,10 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
   const strip = h("canvas", { width: 1100, height: 90 });
   const game = h("video", { playsInline: true });
   const face = h("video", { playsInline: true });
-  await Promise.all([loadVideo(game, videos.game), loadVideo(face, videos.face)]);
-
-  const audio = new AudioContext();
-  const mix = audio.createMediaStreamDestination();
-  for (const v of [game, face]) audio.createMediaElementSource(v).connect(mix); // not connected to the speakers
-  const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...mix.stream.getAudioTracks()]);
-  // MP4 first: it plays in QuickTime and posts anywhere. Chrome records it since v126; otherwise WebM.
-  const type = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
-  const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 5_000_000 });
+  let audio: AudioContext | undefined, stream: MediaStream | undefined, rec: MediaRecorder | undefined;
   const chunks: Blob[] = [];
-  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  // A stalled seek must not hang the reel forever.
+  const seek = (v: HTMLVideoElement, t: number) => Promise.race([seekTo(v, t), wait(3000)]);
 
   const card = async (title: string, sub: string, color: string, ms: number) => {
     const t0 = performance.now();
@@ -85,9 +84,11 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
 
   const clip = async (m: Moment) => {
     const from = Math.max(0, m.t - REEL_BEFORE), to = Math.min(s.duration, m.t + REEL_AFTER);
-    await Promise.all([seekTo(game, from), seekTo(face, from)]);
-    await Promise.all([game.play(), face.play()]);
-    while (game.currentTime < to && !game.ended) {
+    await Promise.all([seek(game, from), seek(face, from)]);
+    await game.play();
+    face.play().catch(() => {}); // a missing face clip leaves the corner still, not the reel broken
+    const deadline = performance.now() + (to - from) * 1000 + 3000; // a stalled video ends the clip instead of hanging
+    while (game.currentTime < to && !game.ended && performance.now() < deadline) {
       if (Math.abs(face.currentTime - game.currentTime) > 0.15) face.currentTime = game.currentTime;
       paintFrame(g, game, face, W, H);
       // Moment label, top left.
@@ -116,6 +117,17 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
   };
 
   try {
+    await Promise.all([loadVideo(game, videos.game), loadVideo(face, videos.face)]);
+    audio = new AudioContext();
+    await audio.resume().catch(() => {});
+    const mix = audio.createMediaStreamDestination();
+    // Once routed here the videos' sound reaches only the recording, never the speakers.
+    for (const v of [game, face]) audio.createMediaElementSource(v).connect(mix);
+    stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...mix.stream.getAudioTracks()]);
+    // MP4 first: it plays in QuickTime and posts anywhere. Chrome records it since v126; otherwise WebM.
+    const type = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+    rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 5_000_000 });
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.start(500);
     await card("Flinch", `${s.tester} playing ${s.build} · ${kept.length} moment${kept.length === 1 ? "" : "s"}`, "#ecebe6", 1500);
     for (const [i, m] of kept.entries()) {
@@ -125,14 +137,20 @@ export async function makeReel(s: Session, videos: Videos, onProgress: (done: nu
     }
     onProgress(kept.length, kept.length);
     await wait(200);
+    const r = rec;
+    await new Promise<void>((done) => (r.state === "inactive" ? done() : ((r.onstop = () => done()), r.stop())));
+    if (!chunks.length) throw new Error("the recorder produced no video. Try again with this tab in front.");
+    return new Blob(chunks, { type: recordedType(r.mimeType, type) });
   } finally {
-    await new Promise<void>((done) => (rec.state === "inactive" ? done() : ((rec.onstop = () => done()), rec.stop())));
-    void audio.close();
+    if (rec && rec.state !== "inactive") rec.stop();
+    stream?.getTracks().forEach((t) => t.stop());
+    void audio?.close().catch(() => {});
     for (const v of [game, face]) {
+      v.pause();
       URL.revokeObjectURL(v.src);
       v.removeAttribute("src");
       v.load();
     }
+    cv.width = strip.width = 0; // frees the canvas backing memory now, not at the next GC
   }
-  return new Blob(chunks, { type: type?.split(";")[0] || "video/webm" });
 }

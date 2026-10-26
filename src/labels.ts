@@ -22,3 +22,10 @@ export function strengthText(strength: number): string {
 }
 
 export const STRENGTH_TIP = "How far the expression moved, in multiples of the tester's normal variation at rest.";
+
+/** One line on why a pin is there, for the review list. */
+export function whyPinned(kind: MomentKind, threshold: number, minSeconds: number): string {
+  if (kind === "mark") return "You pressed M here during play.";
+  const what = kind === "frustration" ? "Tension in the brows and lips" : "The smile";
+  return `${what} stayed above ${threshold}× the tester's resting variation for at least ${minSeconds} s.`;
+}

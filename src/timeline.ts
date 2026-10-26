@@ -13,6 +13,8 @@ export type TimelineOpts = {
   playhead?: number;
   selected?: string | null;
   threshold?: number;
+  /** Text written at the right end of the dashed threshold line (Review only). */
+  thresholdLabel?: string;
   /** Another session's samples, drawn dashed and faded behind this one's (compare builds). */
   ghost?: Sample[];
   /** Time under the mouse, drawn as a faint guide. */
@@ -56,6 +58,14 @@ export function drawTimeline(cv: HTMLCanvasElement, samples: Sample[], o: Timeli
     g.lineTo(w - PAD.x, Math.round(y(o.threshold)) + 0.5);
     g.stroke();
     g.setLineDash([]);
+    if (o.thresholdLabel) {
+      g.fillStyle = css("--muted");
+      g.font = `10px ${css("--mono")}`;
+      g.textAlign = "right";
+      g.textBaseline = "bottom";
+      g.fillText(o.thresholdLabel, w - PAD.x, Math.round(y(o.threshold)) - 2);
+      g.textAlign = "left";
+    }
   }
 
   // Time ticks.

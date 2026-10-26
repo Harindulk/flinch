@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { notesMarkdown } from "../src/export";
+import { notesMarkdown, recordedType } from "../src/export";
+import { StorageError, storageError } from "../src/store";
 import type { Session } from "../src/types";
 
 const base: Session = {
@@ -27,11 +28,37 @@ describe("notesMarkdown", () => {
     expect(md).not.toMatch(/\| (Frustration|Delight) \|/);
   });
 
-  it("leaves out dismissed moments", () => {
+  it("leaves out dismissed moments, and says how many", () => {
     expect(md).not.toContain("1:10");
+    expect(md).toContain('1 pin dismissed as "not a reaction" and left out.');
+    expect(notesMarkdown({ ...base, moments: base.moments.filter((m) => !m.dismissed) })).not.toContain("dismissed");
   });
 
   it("says so when nothing was pinned", () => {
     expect(notesMarkdown({ ...base, moments: [] })).toContain("No moments were pinned");
+  });
+});
+
+describe("recordedType", () => {
+  it("names the container the recorder really wrote, not the one asked for", () => {
+    expect(recordedType("video/mp4;codecs=avc1,mp4a.40.2", "video/mp4")).toBe("video/mp4");
+    expect(recordedType("video/webm;codecs=vp9,opus", "video/mp4")).toBe("video/webm");
+    expect(recordedType("", "video/mp4")).toBe("video/mp4");
+    expect(recordedType("", undefined)).toBe("video/webm");
+  });
+});
+
+describe("storageError", () => {
+  it("tells the user when storage is full, so they can download instead", () => {
+    const e = storageError(new DOMException("over", "QuotaExceededError"));
+    expect(e).toBeInstanceOf(StorageError);
+    expect(e.full).toBe(true);
+    expect(e.message).toMatch(/full.*Download the recording/);
+  });
+  it("explains blocked storage (private window) and unknown failures in plain words", () => {
+    expect(storageError(new DOMException("blocked", "SecurityError")).message).toMatch(/private window/);
+    expect(storageError(new ReferenceError("indexedDB is not defined")).full).toBe(false);
+    expect(storageError(new Error("disk on fire")).message).toBe("Browser storage failed: disk on fire. Download the recording so it isn't lost.");
+    expect(storageError(null).message).toBe("Browser storage failed. Download the recording so it isn't lost.");
   });
 });
