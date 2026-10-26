@@ -107,9 +107,12 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
     stopBtn.hidden = false;
     startBtn.disabled = false;
     say.textContent = "Loading the face reader…";
+    const slow = setTimeout(() => (say.textContent = "Still downloading the face model (about 17 MB). Only the first time."), 6000);
     try {
       reader = await FaceReader.start(cam);
+      clearTimeout(slow);
     } catch {
+      clearTimeout(slow);
       say.textContent = "The face reader couldn't start. Reload the page and try again.";
       stop();
       return;

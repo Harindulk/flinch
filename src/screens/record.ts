@@ -284,9 +284,13 @@ export function recordScreen(ctx: RecordCtx): Screen {
     const startReader = () => {
       phase = "loading";
       status.textContent = "Getting ready";
-      say(h("div", { class: "spinner" }), h("h2", {}, "Loading the face reader…"), h("p", {}, "A few seconds the first time. It runs on this computer."));
+      const note = h("p", {}, "A few seconds the first time. It runs on this computer.");
+      say(h("div", { class: "spinner" }), h("h2", {}, "Loading the face reader…"), note);
+      const slow = setTimeout(() => (note.textContent = "Still downloading the face model (about 17 MB). On a slow connection this takes a minute, only the first time."), 8000);
+      const clearSlow = () => clearTimeout(slow);
       FaceReader.start(ctx.cam).then(
         (r) => {
+          clearSlow();
           reader = r;
           r.onFace = onFace;
           r.onCrash = () => {
@@ -299,6 +303,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
           if (phase === "loading") calibrateNow();
         },
         (err: unknown) => {
+          clearSlow();
           status.textContent = "Face reader failed";
           say(
             icon("alert", "big warn"),

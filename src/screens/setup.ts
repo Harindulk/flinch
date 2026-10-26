@@ -2,6 +2,7 @@ import { h } from "../dom";
 import { CaptureError, openCamera, pickWindow, stopStream } from "../capture";
 import { icon, type IconName } from "../icons";
 import { show, type Screen } from "../nav";
+import { warmFaceModel } from "../face";
 import { homeScreen } from "./home";
 import { recordScreen } from "./record";
 
@@ -110,6 +111,7 @@ export function setupScreen(prefill: { tester?: string; build?: string } = {}): 
       ),
     );
     refresh();
+    warmFaceModel();
 
     return () => {
       if (!handedOff) {

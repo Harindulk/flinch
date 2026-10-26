@@ -6,6 +6,25 @@ type Msg =
   | { type: "face"; at: number; shapes: Shapes | null; faces: number }
   | { type: "loud"; at: number; rms: number };
 
+// What the worker downloads before it can read a face (about 17 MB). Same URLs the worker uses, so a warm-up fills the HTTP cache.
+const MODEL_FILES = ["wasm/vision_wasm_module_internal.js", "wasm/vision_wasm_module_internal.wasm", "models/face_landmarker.task"];
+let warmed = false;
+
+/**
+ * Downloads the face reader's files in the background while the visitor reads, so pressing
+ * Calibrate doesn't wait on 17 MB. Skipped on data-saver connections; failures are harmless.
+ */
+export function warmFaceModel() {
+  const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+  if (warmed || saveData) return;
+  warmed = true;
+  const go = async () => {
+    for (const f of MODEL_FILES) await fetch(new URL(f, document.baseURI)).then((r) => r.arrayBuffer()).catch(() => {});
+  };
+  if ("requestIdleCallback" in window) requestIdleCallback(() => void go(), { timeout: 4000 });
+  else setTimeout(() => void go(), 2000);
+}
+
 /** Starts the face worker on the camera's video and audio tracks. */
 export class FaceReader {
   /** Called for each face read: absolute time (ms), the nearest face's blendshapes (null when none), recent mic loudness, faces in view. */

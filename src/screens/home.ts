@@ -5,6 +5,7 @@ import { icon } from "../icons";
 import { KIND_LABEL, MEASURE_NOTE } from "../labels";
 import { PINS, reviewDemo, sceneThumb } from "../landing/demo";
 import { tryIt } from "../landing/tryit";
+import { warmFaceModel } from "../face";
 import { show, type Screen } from "../nav";
 import { deleteSession, getSession, listSessions } from "../store";
 import type { Session } from "../types";
@@ -101,6 +102,7 @@ export function homeScreen(): Screen {
       ),
     );
     reveal(root);
+    if (ok) warmFaceModel();
     return () => tryit.stop(); // never leave the visitor's camera on after they move on
   };
 }
