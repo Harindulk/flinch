@@ -36,7 +36,7 @@ const STOPS: Stop[] = [
 ];
 
 /**
- * The page's signature: a reaction trace along the bottom edge. Scroll is the playhead; each section
+ * The page's signature: a reaction trace under the sticky nav. Scroll is the playhead; each section
  * stamps a pin as you pass it, so by the end the trace is a record of the visit, and every pin jumps
  * to its section. It is drawn from scroll position only; nothing here reads the visitor's face.
  */
@@ -56,8 +56,8 @@ export function scrollTrace(landing: HTMLElement): () => void {
     h("div", { class: "tr-track" }, drawn, head, ...pins),
     clock,
   );
-  landing.append(bar);
-  landing.classList.add("has-trace");
+  // Under the sticky nav, as part of the header: it never sits over the page's text.
+  (landing.querySelector(".l-nav") ?? landing.firstElementChild)!.after(bar);
 
   let at: number[] = [];
   const layout = () => {
