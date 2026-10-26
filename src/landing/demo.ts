@@ -130,11 +130,13 @@ export function reviewDemo(): HTMLElement {
   );
   let anims: Animation[] = [];
   let clockTimer = 0;
+  let faceTimer = 0;
 
   const play = (i: number) => {
     const p = PINS[i];
     anims.forEach((a) => a.cancel());
     clearInterval(clockTimer);
+    clearTimeout(faceTimer); // a replay cut short must not change the next one's face
     rows.forEach((r, j) => r.classList.toggle("on", j === i));
     line.pins.forEach((pin, j) => pin.classList.toggle("on", j === i));
     caption.textContent = `${timecode(p.t)} · ${KIND_LABEL[p.kind]}: ${p.note}. Replaying from ${timecode(p.t - 3)}.`;
@@ -152,7 +154,7 @@ export function reviewDemo(): HTMLElement {
     clockTimer = window.setInterval(tick, 50);
     tick();
     const moment = 3 / 4; // the pinned second, as a share of the 4 s replay
-    setTimeout(() => face.set(p.kind === "frustration" ? "frown" : p.kind === "delight" ? "smile" : "rest"), reduced() ? 0 : dur * moment);
+    faceTimer = window.setTimeout(() => face.set(p.kind === "frustration" ? "frown" : p.kind === "delight" ? "smile" : "rest"), reduced() ? 0 : dur * moment);
     const kf =
       p.scene === "fall"
         ? [{ transform: "translate(150px,230px)" }, { transform: "translate(285px,230px)", offset: 0.45 }, { transform: "translate(325px,190px)", offset: 0.62 }, { transform: "translate(345px,250px)", offset: 0.75 }, { transform: "translate(350px,330px)" }]

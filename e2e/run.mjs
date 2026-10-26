@@ -506,6 +506,15 @@ await test("landing: pins replay, a note is kept, questions answer, the form fil
   const mouth = await page.getAttribute(".f-mouth", "d");
   assert(mouth.startsWith("M45 63"), `the face should smile at the delight moment, mouth ${mouth}`);
   assert((await page.textContent(".d-clock")).startsWith("1:52"), `the clock should end 1 s after the moment: ${await page.textContent(".d-clock")}`);
+  await page.click(".d-row.frustration");
+  await page.waitForTimeout(300);
+  await page.click(".d-row.delight"); // cut the frustration replay short
+  // The old replay's frown was due ~1.65 s after this click; the new smile is due at ~1.95 s. In between: still at rest.
+  await page.waitForTimeout(1800);
+  const between = await page.getAttribute(".f-mouth", "d");
+  assert(between.startsWith("M48 66"), `a cut-short replay must not leave its frown on the next one (mouth ${between})`);
+  await page.waitForTimeout(1100);
+  assert((await page.getAttribute(".f-mouth", "d")).startsWith("M45 63"), "the delight replay should end on a smile");
   await page.fill(".m-card.open .m-note", "Shorter jump");
   await page.click(".m-card.open button");
   assert((await page.$$eval(".m-card.kept", (els) => els.map((e) => e.textContent))).some((t) => t.includes("Shorter jump")), "the note should be kept");
