@@ -55,7 +55,7 @@ function explain(e: unknown, what: "screen" | "camera"): CaptureError {
   if (name === "NotAllowedError" || name === "SecurityError")
     return what === "screen"
       ? new CaptureError("denied", "Screen sharing was cancelled or blocked. Click again and pick the game window.")
-      : new CaptureError("denied", "Camera or microphone is blocked. Click the camera icon in Chrome's address bar, allow both, then try again.");
+      : new CaptureError("denied", "Camera or microphone is blocked. In Chrome, click the camera icon in the address bar, allow both, then try again. Browsers built into other apps often can't use the camera at all: open Flinch in Chrome.");
   if (name === "NotFoundError" || name === "OverconstrainedError")
     return new CaptureError("missing", what === "screen" ? "No screen or window to share was found." : "No webcam or microphone found. Flinch needs a webcam to read reactions.");
   if (name === "NotSupportedError" || !window.isSecureContext)
