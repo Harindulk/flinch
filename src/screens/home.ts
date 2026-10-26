@@ -5,6 +5,8 @@ import { icon } from "../icons";
 import { KIND_LABEL, MEASURE_NOTE } from "../labels";
 import { PINS, reviewDemo, sceneThumb } from "../landing/demo";
 import { tryIt } from "../landing/tryit";
+import { scrollTrace, problemTrace } from "../landing/scroll";
+import "../landing/scrollcraft.js"; // scroll-craft engine, vendored unmodified; reads data-sc-* off the markup
 import { warmFaceModel } from "../face";
 import { show, type Screen } from "../nav";
 import { deleteSession, getSession, listSessions } from "../store";
@@ -109,8 +111,17 @@ export function homeScreen(): Screen {
       ),
     );
     reveal(root);
+    const landing = root.querySelector<HTMLElement>(".landing")!;
+    const sc = (window as unknown as { ScrollCraft: { mount(el: HTMLElement): { destroy(): void } } }).ScrollCraft.mount(landing);
+    const stopTrace = scrollTrace(landing);
+    const stopProblem = problemTrace(landing);
     if (ok) warmFaceModel();
-    return () => tryit.stop(); // never leave the visitor's camera on after they move on
+    return () => {
+      tryit.stop(); // never leave the visitor's camera on after they move on
+      sc.destroy();
+      stopTrace();
+      stopProblem();
+    };
   };
 }
 
@@ -129,7 +140,7 @@ function hero(action: HTMLElement, ok: boolean, saved: HTMLElement) {
     void word.offsetWidth; // restart the animation
     word.classList.add("jolt");
   };
-  return h("header", { class: "l-hero" },
+  return h("header", { class: "l-hero", dataset: { scAct: "flow" } },
     h("div", { class: "l-wrap l-hero-copy" },
       h("h1", {}, "See the moment they ", word, "."),
       h("p", { class: "l-lede" }, "Find the gameplay moments your playtesters couldn't put into words."),
@@ -138,20 +149,38 @@ function hero(action: HTMLElement, ok: boolean, saved: HTMLElement) {
       saved,
       h("p", { class: "l-meta" }, "Free and open source · desktop Chrome or Edge · no account, nothing uploaded"),
     ),
-    h("div", { class: "l-stage shutter" },
+    h("div", { class: "l-stage shutter", dataset: { scParallax: "-0.12" } },
       h("div", { class: "l-stage-inner" }, h("p", { class: "l-sample" }, "Sample playtest, drawn for this page. Click a moment to replay it."), reviewDemo(jolt)),
     ),
   );
 }
 
 function problem() {
-  return h("section", { class: "l-problem l-wrap", id: "problem" },
-    h("div", { class: "l-problem-copy" },
-      h("h2", {}, "“It was fine,” they said."),
-      h("p", {}, "Friends who test your game are kind. They say it was fine after dying at the same jump five times. You were watching the screen, so you missed the sigh."),
-      h("p", {}, "Flinch watches the face instead. Ten seconds of calibration teaches it what this tester looks like at rest; after that, every clear change from rest becomes a pin on the timeline."),
+  // The peak: the frame holds while the copy advances and a sample reaction line draws under the photo.
+  // When the line crosses the pin line, a pin drops (src/landing/scroll.ts reads the act's --sc-p).
+  return h("section", { class: "l-problem", id: "problem", dataset: { scAct: "pin", scSpan: "2.4" } },
+    h("div", { class: "pb-stage", dataset: { scStage: "" } },
+      h("div", { class: "l-wrap pb-grid" },
+        h("div", { class: "pb-copy" },
+          h("h2", {}, "“It was fine,” they said."),
+          h("div", { class: "pb-lines" },
+            h("p", { dataset: { scCue: "0 0.38 0" } }, "Friends who test your game are kind. They died at the long jump five times, then said it was fine."),
+            h("p", { dataset: { scCue: "0.32 0.68" } }, "You were watching the screen, so you missed the sigh at 0:42."),
+            h("p", { dataset: { scCue: "0.62 1" } }, "Flinch watches the face. Ten seconds of calibration learn this tester's rest; every clear change after that becomes a pin."),
+          ),
+        ),
+        h("figure", { class: "pb-pic" },
+          h("div", { class: "pb-frame" },
+            photo(PHOTOS.arcade, "tall"),
+            h("div", { class: "pb-trace", dataset: { ui: "" } } as never,
+              h("div", { class: "pb-trace-head" }, h("span", { class: "pb-clock" }, "0:00"), h("span", { class: "pb-pin-label" }, "0:42 · Possible frustration · 5.8×")),
+              h("div", { class: "pb-svg" }),
+            ),
+          ),
+          h("figcaption", {}, "Sample reaction line, drawn for this page. Concentration looks like a frown, so Flinch learns each tester's resting face and pins only what changes."),
+        ),
+      ),
     ),
-    h("figure", { class: "l-problem-pic" }, photo(PHOTOS.arcade, "tall"), h("figcaption", {}, "Concentration looks like a frown. Flinch learns each tester's resting face so it only pins what changes.")),
   );
 }
 
@@ -251,15 +280,20 @@ function takeaway() {
       // The stem truncates; the tail stays so the file type is always visible.
       h("div", { class: "f-file" }, icon("download"), h("span", { class: "f-name", title: n }, h("span", {}, n.slice(0, n.lastIndexOf("-"))), h("span", {}, n.slice(n.lastIndexOf("-")))), h("span", { class: "f-size" }, s))),
   );
-  const row = (title: string, text: string, frag: HTMLElement, cls = "") =>
-    h("div", { class: `t-row ${cls}` }, h("div", { class: "t-copy" }, h("h3", {}, title), h("p", {}, text)), h("div", { class: "t-frag" }, frag));
-  return h("section", { class: "l-take l-wrap", id: "takeaway" },
-    h("h2", {}, "What you take back to the build"),
-    row("A fix list", "Every kept moment with its time, size of change and your note, as Markdown you can paste into your tracker.", h("pre", { class: "t-code" }, h("code", {}, notes))),
-    row("A highlight reel", "Each moment as a short clip with a title card and the reaction line under it. MP4 where Chrome can make one.", reel, "flip"),
-    row("The whole session", "The game and the face as two files, so nothing is lost if you want to watch it all again.", files),
-    row("Did the fix work?", "Test the next build and compare: the last playtest's line sits dashed behind the new one, with a plain verdict.", compareFragment(), "flip"),
-    h("figure", { class: "l-take-pic" }, photo(PHOTOS.paper, "wide"), h("figcaption", {}, "Then it's back to the level design.")),
+  const item = (title: string, text: string, frag: HTMLElement) =>
+    h("article", { class: "tk-item" }, h("div", { class: "tk-frag" }, frag), h("h3", {}, title), h("p", {}, text));
+  // Sideways reads as range: four things you leave with, pulled past like a drawer.
+  return h("section", { class: "l-take", id: "takeaway", dataset: { scAct: "pan", scSpan: "3.6" } },
+    h("div", { class: "tk-stage", dataset: { scStage: "" } },
+      h("div", { class: "tk-window" }, h("div", { class: "tk-rail", dataset: { scPan: "0" } },
+        h("div", { class: "tk-item tk-head" }, h("h2", {}, "What you take back to the build"), h("p", {}, "Four things, all saved on this computer.")),
+        item("A fix list", "Every kept moment with its time, size of change and your note, as Markdown you can paste into your tracker.", h("pre", { class: "t-code", tabIndex: 0, ariaLabel: "Sample fix list in Markdown" }, h("code", {}, notes))),
+        item("A highlight reel", "Each moment as a short clip with a title card and the reaction line under it. MP4 where Chrome can make one.", reel),
+        item("The whole session", "The game and the face as two files, so nothing is lost if you want to watch it all again.", files),
+        item("Did the fix work?", "Test the next build and compare: the last playtest's line sits dashed behind the new one, with a plain verdict.", compareFragment()),
+        h("figure", { class: "tk-item tk-end" }, photo(PHOTOS.paper, "wide"), h("figcaption", {}, "Then it's back to the level design.")),
+      )),
+    ),
   );
 }
 
@@ -295,14 +329,14 @@ function privacy() {
     ["No account, no server, no analytics.", "There is nothing to sign up for and nothing tracking the page."],
     ["Open source, MIT licence.", "Every line is on GitHub to read, change and run yourself."],
   ];
-  return h("section", { class: "l-privacy", id: "privacy" },
+  return h("section", { class: "l-privacy", id: "privacy", dataset: { scAct: "flow" } },
     h("div", { class: "l-wrap l-privacy-grid" },
       h("div", {},
         h("h2", {}, "Nothing leaves this computer."),
         h("dl", { class: "p-facts" }, ...facts.flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)])),
         h("a", { class: "p-link", href: REPO, rel: "noopener" }, "Read the code on GitHub"),
       ),
-      h("figure", { class: "l-privacy-pic" }, photo(PHOTOS.lan, "square"), h("figcaption", {}, "Built for testing at home, with a friend next to you.")),
+      h("figure", { class: "l-privacy-pic" }, h("div", { dataset: { scReveal: "iris", scRevealAt: "0.12 0.42" } }, photo(PHOTOS.lan, "square")), h("figcaption", {}, "Built for testing at home, with a friend next to you.")),
     ),
   );
 }
@@ -381,7 +415,7 @@ function footer() {
 /** Section parts rise in as they enter; content is visible without script or with reduced motion. */
 function reveal(root: HTMLElement) {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
-  const targets = root.querySelectorAll<HTMLElement>(".landing section > *, .landing section .l-wrap > *, .h-step, .t-row, .s-row");
+  const targets = [...root.querySelectorAll<HTMLElement>(".landing section > *, .landing section .l-wrap > *, .h-step, .s-row")].filter((t) => !t.closest("[data-sc-act=pin], [data-sc-act=pan]"));
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) if (e.isIntersecting) {
       e.target.classList.add("in");
