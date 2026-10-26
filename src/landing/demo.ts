@@ -115,7 +115,7 @@ export function reviewDemo(): HTMLElement {
   const face = faceView();
   const line = timelineView();
   const clock = h("span", { class: "d-clock" }, `0:39 / ${timecode(SESSION_S)}`);
-  const caption = h("p", { class: "d-caption", ariaLive: "polite" });
+  const caption = h("p", { class: "d-caption", ariaLive: "off" }); // announced only once the visitor drives it
   const rows = PINS.map((p, i) =>
     h("button", { class: `d-row ${p.kind}`, type: "button", dataset: { i: String(i) }, ariaLabel: `Replay ${KIND_LABEL[p.kind]} at ${timecode(p.t)}, ${p.note}` },
       h("span", { class: "d-time" }, timecode(p.t)),
@@ -174,9 +174,24 @@ export function reviewDemo(): HTMLElement {
     h("div", { class: "d-rows" }, ...rows),
     caption,
   );
-  for (const b of [...rows, ...pinHits]) b.addEventListener("click", () => play(Number(b.dataset.i)));
-  // Open on the first pin, paused just before the moment: the first thing a visitor sees is a real replay waiting.
+  // Until someone clicks, the demo walks through its pins on its own while it is on screen.
+  let auto = 0, next = 1, onScreen = true;
+  const stopAuto = () => clearInterval(auto);
+  for (const b of [...rows, ...pinHits])
+    b.addEventListener("click", () => {
+      stopAuto();
+      caption.ariaLive = "polite";
+      play(Number(b.dataset.i));
+    });
+  new IntersectionObserver(([e]) => (onScreen = e.isIntersecting)).observe(root);
   requestAnimationFrame(() => play(0));
+  if (!reduced())
+    auto = window.setInterval(() => {
+      if (!root.isConnected) return stopAuto();
+      if (!onScreen || document.hidden) return;
+      play(next);
+      next = (next + 1) % PINS.length;
+    }, 4200);
   return root;
 }
 

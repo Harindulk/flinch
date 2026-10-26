@@ -23,6 +23,7 @@
 .l-hero h1 { font-size: clamp(52px, 5.2vw, 82px); line-height: 0.98; letter-spacing: -0.035em; font-weight: 680; max-width: 9.5em; margin: 0; }
 .l-lede { font-size: 22px !important; line-height: 1.45 !important; max-width: 40ch !important; margin: 32px 0 28px !important; color: var(--ink); }
 .l-cta { height: 48px; padding: 0 22px; font-size: 17px; }
+.l-try-link { display: inline-block; margin-left: 20px; font-size: 17px; color: var(--ink); }
 .l-stage { position: absolute; left: 41%; right: 0; top: 40%; bottom: 0; background: var(--frus);
   clip-path: polygon(0 72px, 72px 0, 100% 0, 100% 100%, 0 100%); }
 .l-stage-inner { position: absolute; left: 56px; top: 56px; }
@@ -67,6 +68,29 @@
 /* Saved sessions (returning visitors) */
 .landing .sessions { margin-top: 64px; display: grid; gap: 10px; }
 .landing .sessions:empty { display: none; }
+
+/* Try it on your own face: words left, the live panel right */
+.l-try { display: grid; grid-template-columns: 4fr 8fr; gap: clamp(32px, 4vw, 64px); align-items: center; }
+.y-small { font-size: 14px !important; color: var(--soft) !important; }
+.y-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.y-panel { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; padding: 16px; background: var(--panel); border-radius: 10px; }
+.y-cam { position: relative; aspect-ratio: 4 / 3; background: #0b0c0d; border-radius: 8px; overflow: hidden; }
+.y-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.y-idle { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.y-panel:not(.idle) .y-idle { display: none; }
+.y-live { display: grid; grid-template-rows: auto auto 1fr; gap: 12px; min-width: 0; }
+.y-say { margin: 0 !important; font-size: 17px !important; font-weight: 600; min-height: 2.9em; }
+.y-strip { width: 100%; height: 110px; display: block; background: var(--bg); border-radius: 6px; }
+.y-strip-wrap { position: relative; }
+.y-example { position: absolute; right: 10px; top: 8px; font-size: 13px; color: var(--muted); }
+.y-pins { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; }
+.y-pin { display: grid; grid-template-columns: 56px 1fr; gap: 8px; align-items: center; padding: 6px; background: var(--bg); border-left: 3px solid var(--c); border-radius: 6px; font-size: 13px; animation: pop 260ms cubic-bezier(0.2, 0.7, 0.1, 1); }
+.y-pin img, .y-pin .thumb-missing { width: 56px; height: 42px; object-fit: cover; border-radius: 4px; }
+.y-pin > div { display: grid; gap: 1px; min-width: 0; }
+.y-x { color: var(--muted); font-size: 13px; }
+.y-pin.frustration { --c: var(--frus); }
+.y-pin.delight { --c: var(--joy); }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.96); } }
 
 /* The problem: words left, the picture right */
 .l-problem { display: grid; grid-template-columns: 5fr 7fr; gap: clamp(32px, 5vw, 80px); align-items: end; }
@@ -189,7 +213,7 @@
 .rise { opacity: 0; transform: translateY(24px); transition: opacity 600ms ease var(--d, 0ms), transform 600ms cubic-bezier(0.2, 0.7, 0.1, 1) var(--d, 0ms); }
 .rise.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
-  .shutter, .shutter .l-stage-inner, .photo.tall { animation: none; }
+  .shutter, .shutter .l-stage-inner, .photo.tall, .y-pin { animation: none; }
   .rise { opacity: 1; transform: none; }
 }
 
@@ -205,7 +229,7 @@
   .d-review { width: 100%; }
   .d-row { grid-template-columns: 40px auto 1fr; }
   .d-row .d-x { display: none; }
-  .l-problem, .t-row, .l-privacy-grid, .l-faq, .l-close-grid { grid-template-columns: 1fr; }
+  .l-problem, .t-row, .l-privacy-grid, .l-faq, .l-close-grid, .l-try, .y-panel { grid-template-columns: 1fr; }
   .t-row.flip .t-copy { order: 0; }
   .l-showcase, .l-how { display: block; }
   .s-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 48px; }

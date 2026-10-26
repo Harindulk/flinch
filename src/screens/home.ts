@@ -4,6 +4,7 @@ import { timecode } from "../format";
 import { icon } from "../icons";
 import { KIND_LABEL, MEASURE_NOTE } from "../labels";
 import { PINS, reviewDemo, sceneThumb } from "../landing/demo";
+import { tryIt } from "../landing/tryit";
 import { show, type Screen } from "../nav";
 import { deleteSession, getSession, listSessions } from "../store";
 import type { Session } from "../types";
@@ -33,6 +34,7 @@ export function homeScreen(): Screen {
     const ok = browserSupported();
     const start = () => show(setupScreen());
     const sessions = h("section", { class: "sessions l-wrap", id: "sessions" });
+    const tryit = tryIt();
 
     const open = async (s: Session) => {
       const saved = await getSession(s.id);
@@ -77,6 +79,7 @@ export function homeScreen(): Screen {
         h("nav", { class: "l-nav l-wrap", ariaLabel: "Flinch" },
           h("a", { class: "l-word", href: "#/" }, "Flinch"),
           h("span", { class: "spacer" }),
+          h("a", { href: "#try", onclick: jump("try") }, "Try it"),
           h("a", { href: "#how", onclick: jump("how") }, "How it works"),
           h("a", { href: "#takeaway", onclick: jump("takeaway") }, "What you get"),
           h("a", { href: "#privacy", onclick: jump("privacy") }, "Privacy"),
@@ -85,6 +88,7 @@ export function homeScreen(): Screen {
         h("main", {},
           hero(action),
           sessions,
+          tryit.el,
           problem(),
           showcase(),
           howItWorks(),
@@ -97,6 +101,7 @@ export function homeScreen(): Screen {
       ),
     );
     reveal(root);
+    return () => tryit.stop(); // never leave the visitor's camera on after they move on
   };
 }
 
@@ -112,6 +117,7 @@ function hero(action: HTMLElement) {
       h("h1", {}, "See the moment they flinched."),
       h("p", { class: "l-lede" }, "Flinch records your game and your tester's face, then pins every sigh, groan and grin so you can replay it. It runs in one Chrome tab and uploads nothing."),
       action,
+      h("a", { class: "l-try-link", href: "#try", onclick: jump("try") }, "or try it on your own face first"),
     ),
     h("div", { class: "l-stage shutter" },
       h("div", { class: "l-stage-inner" }, reviewDemo()),

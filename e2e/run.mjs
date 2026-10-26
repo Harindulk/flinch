@@ -500,6 +500,8 @@ await test("saves the playtest even when gap filling fails", async () => {
 await test("landing: pins replay, a note is kept, questions answer, the form fills setup", async () => {
   const page = await launch();
   await page.waitForSelector(".d-row.on");
+  await page.waitForTimeout(4700);
+  assert((await page.getAttribute(".d-row.on", "data-i")) === "1", "the demo should move to the next pin on its own");
   await page.click(".d-row.delight");
   await page.waitForTimeout(2900);
   assert((await page.textContent(".d-caption")).includes("Possible delight"), "caption should name the replayed moment");
@@ -525,6 +527,25 @@ await test("landing: pins replay, a note is kept, questions answer, the form fil
   await page.click("#start button[type=submit]");
   await page.waitForSelector("#tester");
   assert((await page.inputValue("#tester")) === "Nimal" && (await page.inputValue("#build")) === "Fail Hard 1.2", "setup should be prefilled");
+});
+
+await test("try it on your own face: live line, a pinned smile with a snapshot, camera off after", async () => {
+  const track = () => {
+    window.__streams = [];
+    const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (c) => { const s = await orig(c); window.__streams.push(s); return s; };
+  };
+  const page = await launch({ camera: "reaction", init: track });
+  await page.click("#try-camera");
+  await page.waitForFunction(() => /Hold still/.test(document.querySelector("#try-say").textContent), null, { timeout: 15000 });
+  const audio = await page.evaluate(() => window.__streams.flatMap((s) => s.getAudioTracks()).length);
+  assert(audio === 0, "the try-it should not ask for the microphone");
+  await page.waitForSelector(".y-pin.delight", { timeout: 40000 });
+  assert((await page.getAttribute(".y-pin.delight img", "src")).startsWith("data:image/jpeg"), "the pin should carry a snapshot of the face");
+  await page.locator("#try").screenshot({ path: `${OUT}try-it.png` });
+  await page.click("#try-stop");
+  const live = await page.evaluate(() => window.__streams.flatMap((s) => s.getTracks()).filter((t) => t.readyState === "live").length);
+  assert(live === 0, `camera still on after Turn it off: ${live} live tracks`);
 });
 
 await test("asks to retry calibration when no face is visible", async () => {

@@ -27,6 +27,15 @@ export async function pickWindow(): Promise<MediaStream> {
 
 const VIDEO = { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" };
 
+/** Just the camera, for the landing page's try-it: no microphone prompt for a ten-second demo. */
+export async function openCameraOnly(): Promise<MediaStream> {
+  try {
+    return await navigator.mediaDevices.getUserMedia({ video: VIDEO });
+  } catch (e) {
+    throw explain(e, "camera");
+  }
+}
+
 export async function openCamera(): Promise<MediaStream> {
   try {
     return await navigator.mediaDevices.getUserMedia({
