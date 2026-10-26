@@ -45,6 +45,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
     root.append(
       h("main", { class: "record" },
         h("header", { class: "bar" },
+          h("h1", { class: "sr-only" }, `Recording ${ctx.tester} playing ${ctx.build}`),
           status, clock,
           h("span", { class: "who" }, `${ctx.tester} · ${ctx.build}`),
           liveCount,

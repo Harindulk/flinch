@@ -250,11 +250,22 @@ await test("explains a blocked camera", async () => {
   assert(await page.isDisabled("#calibrate"), "Calibrate should stay disabled");
 });
 
+// AXE=/path/to/axe.min.js runs the axe accessibility checker on every screen (not part of the normal run).
+async function axe(page, name) {
+  if (!process.env.AXE) return;
+  await page.addScriptTag({ path: process.env.AXE });
+  const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations
+    .map((x) => `${x.impact} ${x.id}: ${x.nodes.length}× ${x.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`));
+  console.log(`  [axe ${name}] ${v.length ? "\n    " + v.join("\n    ") : "no violations"}`);
+}
+
 await test("screens (visual check)", async () => {
   const page = await launch({ camera: "reaction" });
   await page.screenshot({ path: `${OUT}s1-home-empty.png` });
+  await axe(page, "s1-home-empty");
   await page.click("#new-playtest");
   await page.screenshot({ path: `${OUT}s2-setup-empty.png` });
+  await axe(page, "s2-setup-empty");
   await page.click("#game-tile-btn");
   await page.click("#cam-tile-btn");
   await page.fill("#tester", "Kasun");
@@ -262,22 +273,27 @@ await test("screens (visual check)", async () => {
   await page.check("#consent");
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${OUT}s3-setup-ready.png` });
+  await axe(page, "s3-setup-ready");
   await page.click("#calibrate");
   await page.waitForSelector("#countdown", { timeout: 30000 });
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}s4-calibrating.png` });
+  await axe(page, "s4-calibrating");
   await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
   await page.waitForTimeout(6000);
   await page.screenshot({ path: `${OUT}s5-recording.png` });
+  await axe(page, "s5-recording");
   await page.waitForTimeout(3000);
   await page.click("#stop");
   await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
   await page.click(".moment.delight .kind");
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}s6-review.png` });
+  await axe(page, "s6-review");
   await page.click("button:has-text('Playtests')");
   await page.waitForSelector(".session-row");
   await page.screenshot({ path: `${OUT}s7-home-list.png` });
+  await axe(page, "s7-home-list");
 });
 
 await test("explains a cancelled screen share and a missing webcam", async () => {

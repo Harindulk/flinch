@@ -23,7 +23,7 @@ export function setupScreen(): Screen {
       const msg = h("p", { class: "tile-msg" }, hint);
       const btn = h("button", { class: "secondary", id: `${id}-btn` }, icon(ico), button);
       const num = h("span", { class: "num" }, String(n));
-      const box = h("section", { class: "tile empty", id }, h("h3", {}, num, title), h("div", { class: "frame" }, video, msg), btn);
+      const box = h("section", { class: "tile empty", id }, h("h2", { class: "label" }, num, title), h("div", { class: "frame" }, video, msg), btn);
       return { box, video, msg, btn, hint, num, n };
     };
     const gameTile = tile(1, "game-tile", "Game window", "monitor", "Choose game window",
@@ -95,11 +95,11 @@ export function setupScreen(): Screen {
       h("main", { class: "setup" },
         h("header", { class: "bar" },
           h("button", { class: "ghost", onclick: () => show(homeScreen()) }, icon("back"), "Back"),
-          h("h2", {}, "New playtest"),
+          h("h1", {}, "New playtest"),
         ),
         h("div", { class: "tiles" }, gameTile.box, camTile.box),
         h("section", { class: "tile details" },
-          h("h3", {}, consentNum, "Tester and consent"),
+          h("h2", { class: "label" }, consentNum, "Tester and consent"),
           h("div", { class: "fields" },
             h("label", {}, "Tester's first name", tester),
             h("label", {}, "Build", build),

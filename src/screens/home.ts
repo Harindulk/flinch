@@ -42,7 +42,7 @@ export function homeScreen(): Screen {
 
     if (ok)
       listSessions().then(
-        (list) => list.length && sessions.replaceChildren(h("h3", {}, "Playtests on this computer"), ...list.map(row)),
+        (list) => list.length && sessions.replaceChildren(h("h2", { class: "label" }, "Playtests on this computer"), ...list.map(row)),
         () => sessions.replaceChildren(h("p", { class: "notice warn" }, "This browser won't let Flinch store playtests (a private window?). You can still record; download each one before closing.")),
       );
 

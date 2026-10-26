@@ -200,7 +200,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     const renderList = () => {
       const auto = session.moments.filter((m) => m.kind !== "mark");
       list.replaceChildren(
-        h("h3", {}, `Moments · ${session.moments.length}`),
+        h("h2", { class: "label" }, `Moments · ${session.moments.length}`),
         ...(auto.length ? [] : [h("p", { class: "empty", id: "no-moments" },
           session.duration < 5
             ? "This session was too short to find reactions. Record at least a minute of play."
@@ -231,7 +231,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
         h("header", { class: "bar" },
           h("button", { class: "ghost", onclick: () => show(homeScreen()) }, icon("back"), "Playtests"),
           h("div", { class: "title-block" },
-            h("h2", {}, `${session.tester} · ${session.build}`),
+            h("h1", {}, `${session.tester} · ${session.build}`),
             h("span", { class: "who" }, `${new Date(session.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · ${timecode(session.duration)}`),
           ),
           h("span", { class: "spacer" }),
