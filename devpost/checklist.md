@@ -3,7 +3,7 @@ doc: checklist
 status: draft
 ---
 
-> Drafted overnight by the agent on 24 Oct 2026, at Harindu's request, while Harindu was away. Built in fast mode without the learner checks; the hands-on checkpoints below wait for Harindu.
+> Planned and built by the agent overnight on 24 Oct 2026, at Harindu's request, while Harindu was away. Built in fast mode without the learner checks; the hands-on checkpoints below wait for Harindu.
 
 # Build Checklist
 

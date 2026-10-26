@@ -165,5 +165,5 @@ None at runtime. No API, no key, no network call after the page loads. `npm inst
 ## Decisions and Open Issues
 - [agent] No server and nothing uploaded: the privacy promise is part of the product (`prd.md > Non-Goals`).
 - [agent] Plain TypeScript + Vite; MediaPipe on CPU (GPU delegate is faster, but CPU proved to work headless and on all Macs).
-- [agent] Thresholds start at 2.5 spreads above rest for 0.5 s; tune on a real playtest. **Genuine unknown:** whether these thresholds catch real reactions without flooding pins. Check: Harindu records one real session and counts pins against what he saw. Unit tests lock the logic; the numbers stay easy to change in `src/moments.ts`.
+- [agent] Thresholds start at 2.5 spreads above rest for 0.5 s; tune on a real playtest. **Genuine unknown:** whether these thresholds catch real reactions without flooding pins. Check: Harindu records one real session and counts pins against what they saw. Unit tests lock the logic; the numbers stay easy to change in `src/moments.ts`.
 - Open (can wait): the reel's sound on or off by default (`prd.md > Open Questions`).

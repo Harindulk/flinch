@@ -13,7 +13,7 @@ A browser playtest recorder that watches the player's face while they play and b
 Playtesters stay quiet; their faces don't. Flinch calibrates to each player's resting face for ten seconds, then turns their expressions into a live frustration/delight line next to the gameplay, and pins every spike as a bookmark you can replay with the game and face side by side. It all runs in one browser tab, and the video never leaves the laptop.
 
 ## Who It's For
-Harindu: a solo indie game dev in Colombo who playtests with friends sitting next to him. Today he watches over their shoulder, asks "was that fine?", and gets "yeah, it was fine." He misses the moment they sighed at a jump, because he was looking at the screen too. Paid services (PlaytestCloud charges about $120 per one-player video) are out of reach for every build.
+Harindu: a solo indie game dev in Colombo who playtests with friends sitting next to them. Today Harindu watches over their shoulder, asks "was that fine?", and gets "yeah, it was fine." The moment the tester sighed at a jump goes unseen, because Harindu was watching the screen too. Paid services (PlaytestCloud charges about $120 per one-player video) are out of reach for every build.
 
 ## The Core Loop
 1. Open Flinch, pick the game window, turn on the webcam, get the friend's consent.
@@ -31,7 +31,7 @@ They come back with every new build: test, fix the top moments, test again, and 
 - Uses Google's MediaPipe Face Landmarker, which gives 52 facial expression scores ("blendshapes") per frame in the browser: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js
 
 ## Why This Matters to the Learner
-Harindu playtests every game he ships (Drive Away, The Final Room, game-jam games) and friends rarely say what annoyed them. This is a tool for his own workflow first. 
+Harindu playtests every game they ship (Drive Away, The Final Room, game-jam games) and friends rarely say what annoyed them. This is a tool for their own workflow first.
 
 ## What "Working" Looks Like
 A friend plays a game (any window: a browser game or a Unity build) for two or three minutes. Harindu presses Stop and immediately sees a timeline where three or four pins sit on the moments the friend groaned or laughed. Clicking one plays the game clip and the friend's face together.
