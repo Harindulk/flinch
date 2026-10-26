@@ -110,7 +110,7 @@ function timelineView() {
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The hero fragment. Returns its root; the first pin is selected and paused on its moment. */
-export function reviewDemo(): HTMLElement {
+export function reviewDemo(onMoment: (kind: MomentKind) => void = () => {}): HTMLElement {
   const game = gameScene();
   const face = faceView();
   const line = timelineView();
@@ -154,7 +154,10 @@ export function reviewDemo(): HTMLElement {
     clockTimer = window.setInterval(tick, 50);
     tick();
     const moment = 3 / 4; // the pinned second, as a share of the 4 s replay
-    faceTimer = window.setTimeout(() => face.set(p.kind === "frustration" ? "frown" : p.kind === "delight" ? "smile" : "rest"), reduced() ? 0 : dur * moment);
+    faceTimer = window.setTimeout(() => {
+      face.set(p.kind === "frustration" ? "frown" : p.kind === "delight" ? "smile" : "rest");
+      onMoment(p.kind);
+    }, reduced() ? 0 : dur * moment);
     const kf =
       p.scene === "fall"
         ? [{ transform: "translate(150px,230px)" }, { transform: "translate(285px,230px)", offset: 0.45 }, { transform: "translate(325px,190px)", offset: 0.62 }, { transform: "translate(345px,250px)", offset: 0.75 }, { transform: "translate(350px,330px)" }]

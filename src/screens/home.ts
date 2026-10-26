@@ -85,6 +85,7 @@ export function homeScreen(): Screen {
           h("a", { href: "#takeaway", onclick: jump("takeaway") }, "What you get"),
           h("a", { href: "#privacy", onclick: jump("privacy") }, "Privacy"),
           h("a", { href: REPO, rel: "noopener" }, "GitHub"),
+          ok ? h("button", { class: "primary small l-nav-cta", type: "button", onclick: start }, "Start a playtest") : null,
         ),
         h("main", {},
           hero(action),
@@ -114,15 +115,23 @@ const jump = (id: string) => (e: Event) => {
 };
 
 function hero(action: HTMLElement) {
+  // The headline flinches with the demo: each time the drawn tester frowns, the word jolts once.
+  const word = h("span", { class: "l-flinch" }, "flinched");
+  const jolt = (kind: string) => {
+    if (kind !== "frustration" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    word.classList.remove("jolt");
+    void word.offsetWidth; // restart the animation
+    word.classList.add("jolt");
+  };
   return h("header", { class: "l-hero" },
     h("div", { class: "l-wrap l-hero-copy" },
-      h("h1", {}, "See the moment they flinched."),
+      h("h1", {}, "See the moment they ", word, "."),
       h("p", { class: "l-lede" }, "Flinch records your game and your tester's face, then pins every sigh, groan and grin so you can replay it. It runs in one Chrome tab and uploads nothing."),
       action,
       h("a", { class: "l-try-link", href: "#try", onclick: jump("try") }, "or try it on your own face first"),
     ),
     h("div", { class: "l-stage shutter" },
-      h("div", { class: "l-stage-inner" }, reviewDemo()),
+      h("div", { class: "l-stage-inner" }, reviewDemo(jolt)),
     ),
   );
 }

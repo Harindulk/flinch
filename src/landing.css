@@ -11,7 +11,12 @@
 .landing section { margin-top: var(--gap); }
 
 /* Navigation */
-.l-nav { display: flex; align-items: center; gap: 28px; height: 76px; font-size: 14px; }
+.l-nav { display: flex; align-items: center; gap: 28px; height: 76px; font-size: 14px; position: sticky; top: 0; z-index: 10; background: var(--bg); }
+.landing > .l-nav { max-width: none; padding-left: max(var(--margin), calc((100% - 1360px) / 2 + var(--margin))); padding-right: max(var(--margin), calc((100% - 1360px) / 2 + var(--margin))); }
+.l-nav-cta { height: 34px; padding: 0 14px; font-size: 14px; }
+.l-flinch { display: inline-block; }
+.l-flinch.jolt { animation: jolt 420ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+@keyframes jolt { 0% { transform: none; } 18% { transform: translate(-0.06em, 0.03em) rotate(-2.5deg); } 36% { transform: translate(0.05em, -0.02em) rotate(1.8deg); } 58% { transform: translate(-0.02em, 0) rotate(-0.8deg); } 100% { transform: none; } }
 .l-nav a { text-decoration: none; color: var(--soft); transition: color 120ms ease; }
 .l-nav a:hover, .l-nav a:focus-visible { color: var(--ink); }
 .l-word { font-weight: 750; font-size: 22px; letter-spacing: -0.02em; color: var(--ink) !important; }
@@ -220,10 +225,11 @@
 /* Phone and tablet: each section re-composed, not squeezed */
 @media (max-width: 900px) {
   .l-nav { gap: 18px; height: 64px; }
-  .l-nav a:not(.l-word):not([href^="http"]) { display: none; }
+  .l-nav a:not(.l-word) { display: none; }
   .l-hero { min-height: 0; overflow: visible; }
   .l-hero h1 { font-size: 10vw; }
   .l-lede { font-size: 16px !important; }
+  .l-try-link { display: block; margin: 16px 0 0; }
   .l-stage { position: relative; left: 0; top: 0; margin-top: 40px; height: 620px; clip-path: polygon(0 56px, 56px 0, 100% 0, 100% 100%, 0 100%); }
   .l-stage-inner { left: 16px; right: 16px; top: 40px; }
   .d-review { width: 100%; }
