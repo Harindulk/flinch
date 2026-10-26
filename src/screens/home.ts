@@ -249,7 +249,33 @@ function takeaway() {
     row("A fix list", "Every kept moment with its time, size of change and your note, as Markdown you can paste into your tracker.", h("pre", { class: "t-code" }, h("code", {}, notes))),
     row("A highlight reel", "Each moment as a short clip with a title card and the reaction line under it. MP4 where Chrome can make one.", reel, "flip"),
     row("The whole session", "The game and the face as two files, so nothing is lost if you want to watch it all again.", files),
+    row("Did the fix work?", "Test the next build and compare: the last playtest's line sits dashed behind the new one, with a plain verdict.", compareFragment(), "flip"),
     h("figure", { class: "l-take-pic" }, photo(PHOTOS.paper, "wide"), h("figcaption", {}, "Then it's back to the level design.")),
+  );
+}
+
+/** A cropped piece of Review's compare panel: last build dashed with its spike, this build solid and flat. */
+function compareFragment() {
+  const pts = (spike: number) => {
+    const out: string[] = [];
+    for (let i = 0; i <= 120; i++) {
+      const x = 8 + i * 4.6;
+      const z = 0.4 + 0.25 * Math.sin(i * 0.9) + spike * Math.exp(-((i - 38) ** 2) / 10);
+      out.push(`${x.toFixed(1)},${(82 - z * 9).toFixed(1)}`);
+    }
+    return out.join(" ");
+  };
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<svg viewBox="0 0 570 90" class="c-line" aria-hidden="true">
+    <line x1="8" x2="562" y1="82.5" y2="82.5" stroke="#2a2d33"/><line x1="8" x2="562" y1="59.5" y2="59.5" stroke="#2a2d33" stroke-dasharray="3 4"/>
+    <polyline points="${pts(6.4)}" fill="none" stroke="#ff5d5d" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.5"/>
+    <polyline points="${pts(0.6)}" fill="none" stroke="#ff5d5d" stroke-width="2"/></svg>`;
+  return h("div", { class: "f-compare", dataset: { ui: "" } },
+    wrap.firstElementChild as SVGSVGElement,
+    h("div", { class: "f-cmp-row" }, h("span", { class: "f-cmp-key" }, "Dashed: Drive Away 0.9"), h("span", { class: "f-cmp-sel" }, "Drive Away 0.9 · Kasun · 24 Oct")),
+    h("p", {}, h("b", {}, "This playtest: "), "0 possible frustrations · 1 possible delight"),
+    h("p", {}, h("b", {}, "Drive Away 0.9: "), "3 possible frustrations, strongest 6.4× · 0 possible delights"),
+    h("p", { class: "f-cmp-verdict" }, "Fewer frustration pins than Drive Away 0.9, and no stronger. More delight too."),
   );
 }
 

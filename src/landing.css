@@ -168,6 +168,13 @@
 .f-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .f-size { color: var(--muted); font-variant-numeric: tabular-nums; }
 .l-take-pic { margin-top: 32px !important; }
+.f-compare { padding: 16px; background: var(--panel); border-radius: 8px; display: grid; gap: 4px; }
+.f-compare svg { width: 100%; height: auto; display: block; background: var(--bg); border-radius: 6px; margin-bottom: 8px; }
+.f-compare p { margin: 0 !important; font-size: 14px !important; color: var(--muted) !important; }
+.f-compare b { color: var(--text); font-weight: 600; }
+.f-compare .f-cmp-verdict { color: var(--text) !important; font-weight: 600; margin-top: 6px !important; }
+.f-cmp-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+.f-cmp-sel { padding: 6px 10px; background: var(--bg); border-radius: 6px; color: var(--text); } /* taste-skill-ignore: inside a data-ui product fragment */
 
 /* Privacy: a whole field of the delight colour */
 .l-privacy { background: var(--joy); color: #111214; padding: clamp(80px, 10vw, 140px) 0; }
