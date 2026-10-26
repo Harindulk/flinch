@@ -16,6 +16,7 @@ import { saveSession } from "../store";
 import type { Moment, Sample, Session } from "../types";
 import { reviewScreen } from "./review";
 import { setupScreen } from "./setup";
+import "../record.css";
 
 export type RecordCtx = { game: MediaStream; cam: MediaStream; tester: string; build: string };
 
@@ -41,6 +42,13 @@ export function recordScreen(ctx: RecordCtx): Screen {
     const strip = h("canvas", { class: "strip", id: "strip", role: "img", ariaLabel: "Live reaction line for the last 30 seconds" });
     const overlayBox = h("div", { class: "box", role: "status" });
     const overlay = h("div", { class: "overlay", id: "overlay" }, overlayBox);
+    const phaseSteps = ["Calibrate", "Record", "Wrap up"].map((label) => h("li", {}, label));
+    const setStep = (i: number) =>
+      phaseSteps.forEach((li, j) => {
+        li.classList.toggle("done", j < i);
+        if (j === i) li.setAttribute("aria-current", "step");
+        else li.removeAttribute("aria-current");
+      });
 
     root.append(
       h("main", { class: "record" },
@@ -48,6 +56,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
           h("h1", { class: "sr-only" }, `Recording ${ctx.tester} playing ${ctx.build}`),
           status, clock,
           h("span", { class: "who" }, `${ctx.tester} · ${ctx.build}`),
+          h("ol", { class: "rec-phases", ariaLabel: "Session steps" }, ...phaseSteps),
           liveCount,
           h("span", { class: "spacer" }),
           markBtn, stopBtn,
@@ -83,6 +92,8 @@ export function recordScreen(ctx: RecordCtx): Screen {
     let live: Moment[] = [];
     let tick = 0;
     let raf = 0;
+    let calibTimer = 0;
+    let disposed = false;
 
     const faceCheck = h("p", { class: "face-check", id: "face-check" }, "Looking for a face…");
 
@@ -123,6 +134,8 @@ export function recordScreen(ctx: RecordCtx): Screen {
     };
 
     const calibrateNow = () => {
+      clearInterval(calibTimer); // a restarted reader must not leave an old countdown running
+      setStep(0);
       phase = "calibrating";
       calib = [];
       calibFrames = 0;
@@ -138,7 +151,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
         faceCheck,
       );
       const t0 = performance.now();
-      const timer = setInterval(() => {
+      const timer = (calibTimer = window.setInterval(() => {
         const left = CALIBRATION_SECONDS - (performance.now() - t0) / 1000;
         count.textContent = String(Math.max(0, Math.ceil(left)));
         bar.style.width = `${Math.min(100, (1 - left / CALIBRATION_SECONDS) * 100)}%`;
@@ -160,15 +173,36 @@ export function recordScreen(ctx: RecordCtx): Screen {
           return;
         }
         startRecording();
-      }, 100);
+      }, 100));
+    };
+
+    // The session ended before recording began (share stopped, camera gone, recorder refused): release everything and say so.
+    const abort = (title: string, text: string) => {
+      clearInterval(calibTimer);
+      phase = "done";
+      reader?.stop();
+      reader = null;
+      stopStream(ctx.game);
+      stopStream(ctx.cam);
+      overlay.hidden = false;
+      status.textContent = "Stopped";
+      say(icon("alert", "big warn"), h("h2", {}, title), h("p", { id: "session-ended" }, text),
+        h("button", { class: "primary", onclick: () => show(setupScreen()) }, "Back to setup"));
     };
 
     const startRecording = () => {
       baseline = calibrate(calib);
       scorer = new Scorer(baseline);
-      rec = new SessionRecorder(ctx.game, ctx.cam);
-      rec.onError = () => void finish();
-      rec.start();
+      try {
+        rec = new SessionRecorder(ctx.game, ctx.cam);
+        rec.onError = (message) => void finish(`${message} Saving what was recorded.`);
+        rec.start();
+      } catch (e) {
+        rec = null;
+        abort("Recording couldn't start", `The browser refused to record (${((e as Error)?.message ?? String(e)).slice(0, 120)}). Go back to setup and share the game window and camera again.`);
+        return;
+      }
+      setStep(1);
       phase = "recording";
       overlay.hidden = true;
       stopBtn.disabled = false;
@@ -199,9 +233,10 @@ export function recordScreen(ctx: RecordCtx): Screen {
     };
 
     const step = (label: string, id: string) => h("li", { id, class: "pending" }, icon("check"), label);
-    const finish = async () => {
+    const finish = async (reason?: string) => {
       if (phase !== "recording" || !rec) return;
       phase = "stopping";
+      setStep(2);
       clearInterval(tick);
       cancelAnimationFrame(raf);
       stopBtn.disabled = markBtn.disabled = true;
@@ -209,11 +244,12 @@ export function recordScreen(ctx: RecordCtx): Screen {
       const steps = [step("Stopping the recording", "st-stop"), step("Finding possible reactions", "st-find"), step("Saving on this computer", "st-save")];
       fillStep = steps[1];
       overlay.hidden = false;
-      say(h("h2", {}, "Wrapping up"), h("ol", { class: "steps-done" }, ...steps));
+      const title = h("h2", {}, "Wrapping up");
+      say(title, reason ? h("p", { id: "end-reason" }, reason) : null, h("ol", { class: "steps-done" }, ...steps));
       const done = (i: number) => steps[i].classList.replace("pending", "done");
       reader?.stop();
       try {
-        await wrapUp(done);
+        await wrapUp(done, title);
       } catch (e) {
         // Never leave the tester staring at "Saving…": say what failed and keep the recording reachable.
         phase = "done";
@@ -221,17 +257,18 @@ export function recordScreen(ctx: RecordCtx): Screen {
         stopStream(ctx.cam);
         status.textContent = "Couldn't finish";
         say(icon("alert", "big warn"), h("h2", {}, "Something went wrong saving this playtest"), h("p", { id: "finish-error" }, (e as Error)?.message ?? String(e)),
-          lastRecording ? h("button", { class: "primary", onclick: () => lastRecording && downloadRaw(lastRecording) }, icon("download"), "Download the recording") : null,
+          lastRecording && (lastRecording.game.size || lastRecording.face.size) ? h("button", { class: "primary", onclick: () => lastRecording && downloadRaw(lastRecording) }, icon("download"), "Download the recording") : null,
           h("button", { class: "ghost", onclick: () => show(setupScreen()) }, "Start again"));
       }
     };
     let lastRecording: Recording | null = null;
     let fillStep: HTMLElement | null = null;
-    const wrapUp = async (done: (i: number) => void) => {
+    const wrapUp = async (done: (i: number) => void, title: HTMLElement) => {
       const recording = await rec!.stop();
       lastRecording = recording;
       stopStream(ctx.game);
       stopStream(ctx.cam);
+      if (!recording.game.size && !recording.face.size) throw new Error("Nothing was recorded: the session ended before the first second of video was saved.");
       done(0);
       if (baseline && findGaps(samples, recording.duration).length) {
         const label = fillStep!.lastChild!;
@@ -256,6 +293,11 @@ export function recordScreen(ctx: RecordCtx): Screen {
       const videos = { game: recording.game, face: recording.face };
       const saved = await saveSession(session, videos).then(() => true, () => false);
       done(2);
+      setStep(3);
+      title.textContent = "Done";
+      status.textContent = saved ? "Saved" : "Not saved";
+      await new Promise((r) => setTimeout(r, 450)); // let the finished checklist register before Review replaces it
+      if (disposed) return;
       phase = "done";
       show(reviewScreen(session, videos, { unsaved: !saved, fresh: true }), `#/review/${session.id}`);
     };
@@ -278,11 +320,24 @@ export function recordScreen(ctx: RecordCtx): Screen {
     };
     addEventListener("beforeunload", onUnload);
     // Stopping the share from Chrome's own bar, or a camera being unplugged, ends the session instead of losing it.
-    ctx.game.getVideoTracks()[0]?.addEventListener("ended", () => void finish());
-    ctx.cam.getVideoTracks()[0]?.addEventListener("ended", () => void finish());
+    const ended = (title: string, before: string, during: string) => () => {
+      if (phase === "recording") void finish(during);
+      else if (phase === "loading" || phase === "calibrating") abort(title, before);
+    };
+    const onGameEnded = ended("Window sharing stopped", "The game window stopped sharing before recording began. Go back to setup and share it again.",
+      "Window sharing stopped, so the session ended. Saving what was recorded.");
+    const onCamEnded = ended("Camera disconnected", "The camera stopped before recording began. Reconnect it, then go back to setup.",
+      "The camera disconnected, so the session ended. Saving what was recorded.");
+    const gameTrack = ctx.game.getVideoTracks()[0];
+    const camTrack = ctx.cam.getVideoTracks()[0];
+    gameTrack?.addEventListener("ended", onGameEnded);
+    camTrack?.addEventListener("ended", onCamEnded);
 
     const startReader = () => {
       phase = "loading";
+      setStep(0);
+      reader?.stop();
+      reader = null;
       status.textContent = "Getting ready";
       const note = h("p", {}, "A few seconds the first time. It runs on this computer.");
       say(h("div", { class: "spinner" }), h("h2", {}, "Loading the face reader…"), note);
@@ -291,6 +346,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
       FaceReader.start(ctx.cam).then(
         (r) => {
           clearSlow();
+          if (disposed || phase === "done") return r.stop();
           reader = r;
           r.onFace = onFace;
           r.onCrash = () => {
@@ -304,6 +360,7 @@ export function recordScreen(ctx: RecordCtx): Screen {
         },
         (err: unknown) => {
           clearSlow();
+          if (disposed || phase === "done") return;
           status.textContent = "Face reader failed";
           say(
             icon("alert", "big warn"),
@@ -322,6 +379,10 @@ export function recordScreen(ctx: RecordCtx): Screen {
     return () => {
       removeEventListener("keydown", onKey);
       removeEventListener("beforeunload", onUnload);
+      gameTrack?.removeEventListener("ended", onGameEnded);
+      camTrack?.removeEventListener("ended", onCamEnded);
+      disposed = true;
+      clearInterval(calibTimer);
       clearInterval(tick);
       cancelAnimationFrame(raf);
       reader?.stop();

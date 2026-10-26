@@ -19,7 +19,9 @@ export function browserSupported(): boolean {
 /** Chrome's own picker for the game window (or a screen). Asks for the game's sound too. */
 export async function pickWindow(): Promise<MediaStream> {
   try {
-    return await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
+    // Keep the Flinch tab out of Chrome's picker: recording ourselves records nothing useful.
+    const opts: DisplayMediaStreamOptions & { selfBrowserSurface?: string } = { video: { frameRate: 30 }, audio: true, selfBrowserSurface: "exclude" };
+    return await navigator.mediaDevices.getDisplayMedia(opts);
   } catch (e) {
     throw explain(e, "screen");
   }
@@ -44,8 +46,10 @@ export async function openCamera(): Promise<MediaStream> {
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
   } catch (e) {
-    // No microphone: the face alone still works, just without the loudness boost.
-    if ((e as DOMException)?.name === "NotFoundError")
+    // No microphone, or only the mic is blocked: the face alone still works, just without the loudness boost.
+    const name = (e as DOMException)?.name;
+    const dismissed = /dismiss/i.test(String((e as Error)?.message));
+    if (name === "NotFoundError" || (name === "NotAllowedError" && !dismissed) || name === "NotReadableError")
       try {
         return await navigator.mediaDevices.getUserMedia({ video: VIDEO });
       } catch (e2) {
@@ -59,17 +63,38 @@ export function stopStream(s?: MediaStream | null) {
   s?.getTracks().forEach((t) => t.stop());
 }
 
+const INSECURE = "Chrome only allows the camera and screen sharing on a secure address. Open Flinch at http://localhost:5173 (or an https link), not a network IP.";
+
+// Every rejection getUserMedia / getDisplayMedia can give, with what to do next.
 function explain(e: unknown, what: "screen" | "camera"): CaptureError {
   const name = (e as DOMException)?.name;
-  if (name === "NotAllowedError" || name === "SecurityError")
-    return what === "screen"
-      ? new CaptureError("denied", "Screen sharing was cancelled or blocked. Click again and pick the game window.")
-      : new CaptureError("denied", "Camera or microphone is blocked. In Chrome, click the camera icon in the address bar, allow both, then try again. Browsers built into other apps often can't use the camera at all: open Flinch in Chrome.");
-  if (name === "NotFoundError" || name === "OverconstrainedError")
-    return new CaptureError("missing", what === "screen" ? "No screen or window to share was found." : "No webcam or microphone found. Flinch needs a webcam to read reactions.");
-  if (name === "NotSupportedError" || !window.isSecureContext)
-    return new CaptureError("unsupported", "Chrome only allows the camera and screen sharing on a secure address. Open Flinch at http://localhost:5173 (or an https link), not a network IP.");
+  const msg = String((e as Error)?.message ?? "");
+  const screen = what === "screen";
+  if (!window.isSecureContext || !navigator.mediaDevices) return new CaptureError("unsupported", INSECURE);
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    if (!screen && /dismiss/i.test(msg))
+      return new CaptureError("denied", "Chrome's permission prompt was closed. Turn the camera on again and choose Allow.");
+    if (/system/i.test(msg))
+      return new CaptureError("denied", screen
+        ? "Screen sharing is blocked by macOS. Open System Settings › Privacy & Security › Screen & System Audio Recording, turn on Chrome, restart Chrome, then choose the game window again."
+        : "The camera is blocked by macOS. Open System Settings › Privacy & Security › Camera (and Microphone), turn on Chrome, restart Chrome, then try again.");
+    return screen
+      ? new CaptureError("denied", "Screen sharing was cancelled. Click Choose game window again, pick the game's window in Chrome's list, then click Share.")
+      : new CaptureError("denied", "The camera is blocked for this site. In Chrome, click the icon at the left of the address bar, open Site settings, set Camera and Microphone to Allow, then turn the camera on again (reload the page if it still fails). Browsers built into other apps often can't use the camera at all: open Flinch in Chrome.");
+  }
+  if (name === "NotFoundError")
+    return new CaptureError("missing", screen ? "No screen or window to share was found. Open the game, then choose its window again." : "No webcam found. Plug one in, then turn the camera on again. Flinch needs a webcam to read expressions.");
+  if (name === "OverconstrainedError")
+    return new CaptureError("missing", screen ? "That window can't be recorded. Pick a different window." : "This webcam can't give a usable picture. Plug in a different webcam and try again.");
   if (name === "NotReadableError")
-    return new CaptureError("other", `The ${what === "screen" ? "screen" : "camera"} is busy in another app. Close it there and try again.`);
-  return new CaptureError("other", `Couldn't open the ${what}: ${(e as Error)?.message ?? e}`);
+    return new CaptureError("other", screen
+      ? "Chrome couldn't start recording that window. Pick it again; if it keeps failing, restart Chrome."
+      : "The camera is busy in another app (Zoom, Teams, FaceTime, OBS or another tab). Close it there, then turn the camera on again.");
+  if (name === "InvalidStateError")
+    return new CaptureError("other", `Keep this tab in front and click the button again to ${screen ? "choose the game window" : "turn on the camera"}.`);
+  if (name === "AbortError")
+    return new CaptureError("other", `The ${screen ? "screen share" : "camera"} stopped before it started. Click the button to try again; if it keeps failing, restart Chrome.`);
+  if (name === "NotSupportedError" || name === "TypeError")
+    return new CaptureError("unsupported", "This browser can't do that. Flinch needs desktop Chrome or Edge.");
+  return new CaptureError("other", `Couldn't open the ${screen ? "game window" : "camera"}${msg ? `: ${msg}` : "."} Try again.`);
 }

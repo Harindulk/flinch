@@ -5,6 +5,7 @@ import { show, type Screen } from "../nav";
 import { warmFaceModel } from "../face";
 import { homeScreen } from "./home";
 import { recordScreen } from "./record";
+import "../setup.css";
 
 export function setupScreen(prefill: { tester?: string; build?: string } = {}): Screen {
   return (root) => {
@@ -24,8 +25,9 @@ export function setupScreen(prefill: { tester?: string; build?: string } = {}): 
       const msg = h("p", { class: "tile-msg" }, hint);
       const btn = h("button", { class: "secondary", id: `${id}-btn` }, icon(ico), button);
       const num = h("span", { class: "num" }, String(n));
-      const box = h("section", { class: "tile empty", id }, h("h2", { class: "label" }, num, title), h("div", { class: "frame" }, video, msg), btn);
-      return { box, video, msg, btn, hint, num, n };
+      const note = h("p", { class: "tile-note", role: "status" });
+      const box = h("section", { class: "tile empty", id }, h("h2", { class: "label" }, num, title), h("div", { class: "frame" }, video, msg), note, btn);
+      return { box, video, msg, btn, hint, num, n, note };
     };
     const gameTile = tile(1, "game-tile", "Game window", "monitor", "Choose game window",
       "Open your game first, then pick its window. Tick “Share audio” if Chrome offers it, so the reel has the game's sound.");
@@ -42,48 +44,77 @@ export function setupScreen(prefill: { tester?: string; build?: string } = {}): 
       missing.classList.toggle("ready", !todo.length);
     };
 
+    const note = (t: typeof gameTile, text: string, warn = false) => {
+      t.note.textContent = text;
+      t.note.classList.toggle("warn", warn);
+    };
+
     const attach = (t: typeof gameTile, s: MediaStream | null, err?: unknown) => {
       t.video.srcObject = s;
       t.box.classList.toggle("empty", !s);
       t.box.classList.toggle("error", Boolean(err));
       t.box.classList.toggle("ok", Boolean(s));
       t.msg.textContent = err ? (err instanceof CaptureError || err instanceof Error ? err.message : "Something went wrong opening it. Try again.") : t.hint;
+      t.note.textContent = "";
+      t.note.classList.remove("warn");
       done(t, Boolean(s));
       refresh();
     };
 
     gameTile.btn.onclick = async () => {
+      let next: MediaStream;
       try {
-        stopStream(game);
-        game = await pickWindow();
-        game.getVideoTracks()[0].addEventListener("ended", () => {
-          game = null;
-          attach(gameTile, null);
-          gameTile.btn.replaceChildren(icon("monitor"), "Choose game window");
-        });
-        gameTile.btn.replaceChildren(icon("monitor"), "Choose a different window");
-        attach(gameTile, game);
+        next = await pickWindow();
       } catch (e) {
-        game = null;
-        attach(gameTile, null, e);
+        // A cancelled re-pick keeps the window that was already shared.
+        if (game) return note(gameTile, `${(e as Error).message} The window you shared before is still in use.`, true);
+        return attach(gameTile, null, e);
       }
+      stopStream(game);
+      game = next;
+      const track = game.getVideoTracks()[0];
+      track.addEventListener("ended", () => {
+        if (game?.getVideoTracks()[0] !== track) return;
+        game = null;
+        attach(gameTile, null, new Error("Sharing stopped. Click Choose game window to share it again."));
+        gameTile.btn.replaceChildren(icon("monitor"), "Choose game window");
+      });
+      gameTile.btn.replaceChildren(icon("monitor"), "Choose a different window");
+      attach(gameTile, game);
+      const surface = track.getSettings().displaySurface;
+      const silent = game.getAudioTracks().length ? "" : " No game sound came with it, so recordings and the reel will be silent on the game's side (Chrome shares sound from tabs, and on Windows from a whole screen).";
+      if (surface === "monitor")
+        note(gameTile, `You shared a whole screen. It works, but the recording shows everything on it, Flinch included. For a clean recording, click Choose a different window and pick just the game.${silent}`, true);
+      else if (silent) note(gameTile, silent.trim());
     };
     camTile.btn.onclick = async () => {
+      let next: MediaStream;
       try {
-        stopStream(cam);
-        cam = await openCamera();
-        cam.getVideoTracks()[0].addEventListener("ended", () => {
-          cam = null;
-          camTile.btn.disabled = false;
-          camTile.btn.replaceChildren(icon("camera"), "Turn on camera & mic");
-          attach(camTile, null, new Error("The camera disconnected. Plug it back in and turn it on again."));
-        });
-        camTile.btn.replaceChildren(icon("check"), cam.getAudioTracks().length ? "Camera and mic on" : "Camera on (no mic found)");
-        camTile.btn.disabled = true;
-        attach(camTile, cam);
+        next = await openCamera();
       } catch (e) {
+        if (cam) return note(camTile, `${(e as Error).message} The camera you turned on before is still in use.`, true);
+        return attach(camTile, null, e);
+      }
+      stopStream(cam);
+      cam = next;
+      const track = cam.getVideoTracks()[0];
+      track.addEventListener("ended", () => {
+        if (cam?.getVideoTracks()[0] !== track) return;
         cam = null;
-        attach(camTile, null, e);
+        camTile.btn.disabled = false;
+        camTile.btn.replaceChildren(icon("camera"), "Turn on camera & mic");
+        attach(camTile, null, new Error("The camera disconnected. Plug it back in and turn it on again."));
+      });
+      const mic = cam.getAudioTracks().length > 0;
+      camTile.btn.replaceChildren(icon(mic ? "check" : "camera"), mic ? "Camera and mic on" : "Camera on, try the mic again");
+      camTile.btn.disabled = mic;
+      attach(camTile, cam);
+      if (!mic) {
+        const blocked = await navigator.permissions?.query({ name: "microphone" as PermissionName }).then((p) => p.state === "denied", () => false);
+        note(camTile, (blocked
+          ? "The microphone is blocked, so Flinch carries on without it. To add it, allow Microphone in Chrome's site settings (icon at the left of the address bar), then click the button below. "
+          : "No microphone found, so Flinch carries on without it. ") +
+          "Expressions are still read; what you lose is the tester's voice in the recording, and laughs or groans won't strengthen a moment.", true);
       }
     };
     consent.onchange = refresh;

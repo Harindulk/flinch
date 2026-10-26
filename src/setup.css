@@ -1,0 +1,3 @@
+.tile-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.tile-note.warn { color: var(--mark); }
+.tile-note:empty { display: none; }

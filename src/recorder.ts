@@ -17,6 +17,7 @@ export class SessionRecorder {
   readonly mimeType = pickMime();
   private recs: MediaRecorder[] = [];
   private chunks: Blob[][] = [[], []];
+  private stopped: Promise<void>[] = [];
   /** Called if either recorder fails mid-session; the caller should stop and save what exists. */
   onError: (message: string) => void = () => {};
 
@@ -35,9 +36,12 @@ export class SessionRecorder {
       });
       rec.ondataavailable = (e) => e.data.size && this.chunks[i].push(e.data);
       rec.onerror = () => this.onError("The recorder stopped unexpectedly.");
+      // Listen from the start: a recorder that stops on its own (its track ended) still delivers its last chunk before "stop".
+      this.stopped.push(new Promise<void>((done) => rec.addEventListener("stop", () => done(), { once: true })));
       rec.start(1000);
       return rec;
     });
+    // Both recorders start in the same task, a few ms apart (under one camera frame), so game and face share t = 0.
     this.startedAt = nowMs();
   }
 
@@ -47,11 +51,9 @@ export class SessionRecorder {
 
   async stop(): Promise<Recording> {
     const duration = this.elapsed();
-    await Promise.all(
-      this.recs.map((rec) =>
-        rec.state === "inactive" ? Promise.resolve() : new Promise<void>((done) => ((rec.onstop = () => done()), rec.stop())),
-      ),
-    );
+    for (const rec of this.recs) if (rec.state !== "inactive") rec.stop();
+    // Never hang on a recorder that doesn't report back: keep whatever chunks arrived.
+    await Promise.race([Promise.all(this.stopped), new Promise((done) => setTimeout(done, 5000))]);
     const type = this.mimeType.split(";")[0] || "video/webm";
     return { game: new Blob(this.chunks[0], { type }), face: new Blob(this.chunks[1], { type }), mimeType: type, duration };
   }
