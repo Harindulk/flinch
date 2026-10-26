@@ -8,7 +8,8 @@ import { Player } from "../player";
 import { drawTimeline, timeAt } from "../timeline";
 import type { Moment, Session, Videos } from "../types";
 import { keptMoments, makeReel, notesMarkdown } from "../export";
-import { updateSession } from "../store";
+import { listSessions, updateSession } from "../store";
+import { compareText, stats } from "../compare";
 import { homeScreen } from "./home";
 
 const LEAD_IN = 3; // jump to a little before the moment, so you see what led to it
@@ -30,9 +31,12 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     const tip = h("div", { class: "tip mono", hidden: true });
     const list = h("section", { class: "moments", id: "moments", ariaLabel: "Moments" });
 
+    let ghost: Session | null = null;
+    // The timeline spans the longer of the two playtests while comparing, so neither is cut off.
+    const span = () => Math.max(session.duration, ghost?.duration ?? 0);
     const redraw = () => {
       clock.textContent = `${timecode(player.time)} / ${timecode(session.duration)}`;
-      drawTimeline(timeline, session.samples, { from: 0, to: session.duration, moments: session.moments, playhead: player.time, selected, threshold: THRESHOLD, hover: hoverT ?? undefined });
+      drawTimeline(timeline, session.samples, { from: 0, to: span(), moments: session.moments, playhead: player.time, selected, threshold: THRESHOLD, hover: hoverT ?? undefined, ghost: ghost?.samples });
     };
     const loop = () => {
       redraw();
@@ -72,8 +76,8 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     prevBtn.disabled = nextBtn.disabled = !session.moments.length;
 
     const pinNear = (clientX: number) => {
-      const t = timeAt(timeline, clientX, 0, session.duration);
-      const px = timeline.clientWidth / Math.max(session.duration, 1);
+      const t = timeAt(timeline, clientX, 0, span());
+      const px = timeline.clientWidth / Math.max(span(), 1);
       return { t, pin: session.moments.find((m) => Math.abs(m.t - t) * px < PIN_HIT_PX) };
     };
     timeline.onclick = (e) => {
@@ -225,6 +229,32 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
     addEventListener("keydown", onKey);
     addEventListener("resize", redraw);
 
+    // Compare builds: another saved playtest drawn dashed behind this one, with a plain summary.
+    const picker = h("select", { id: "compare", ariaLabel: "Compare with another playtest" }, h("option", { value: "" }, "Compare with another playtest…"));
+    const summary = h("div", { class: "cmp-summary", id: "compare-summary", ariaLive: "polite" });
+    const compareBar = h("div", { class: "cmp-bar", hidden: true }, h("span", { class: "cmp-key" }, "Dashed line: the playtest you compare with"), picker, summary);
+    const label = (s: Session) => `${s.build} · ${s.tester} · ${new Date(s.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+    let others: Session[] = [];
+    listSessions().then((all) => {
+      others = all.filter((s) => s.id !== session.id);
+      if (!others.length) return;
+      picker.append(...others.map((s) => h("option", { value: s.id }, label(s))));
+      compareBar.hidden = false;
+    }, () => {});
+    picker.onchange = () => {
+      ghost = others.find((s) => s.id === picker.value) ?? null;
+      summary.replaceChildren();
+      if (ghost) {
+        const t = compareText(stats(session), stats(ghost), ghost.build === session.build ? `the ${label(ghost)} run` : ghost.build);
+        summary.append(
+          h("p", {}, h("b", {}, "This playtest: "), t.now),
+          h("p", {}, h("b", {}, `${label(ghost)}: `), t.before),
+          h("p", { class: "cmp-verdict" }, t.verdict),
+        );
+      }
+      redraw();
+    };
+
     const faceShare = session.samples.length ? session.samples.filter((x) => x.face).length / session.samples.length : 1;
     root.append(
       h("main", { class: "review", id: "review", dataset: { samples: String(session.samples.length), faces: String(session.samples.filter((x) => x.face).length), maxGap: String(maxGap(session)) } },
@@ -254,6 +284,7 @@ export function reviewScreen(session: Session, videos: Videos, opts: { unsaved?:
               ),
             ),
             h("div", { class: "timeline-wrap" }, timeline, tip),
+            compareBar,
             h("p", { class: "hint" },
               "Click a pin or a moment to replay from 3 seconds before. ",
               h("kbd", {}, "Space"), " play/pause · ", h("kbd", {}, "←"), h("kbd", {}, "→"), " 5 s · ", h("kbd", {}, "N"), h("kbd", {}, "P"), " next/previous moment. ",

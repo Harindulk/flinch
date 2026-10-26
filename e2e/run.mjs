@@ -548,6 +548,30 @@ await test("try it on your own face: live line, a pinned smile with a snapshot, 
   assert(live === 0, `camera still on after Turn it off: ${live} live tracks`);
 });
 
+await test("compares two builds on Review", async () => {
+  // Two playtests in one browser: the first catches a smile, the second stays calm.
+  const page = await launch({ camera: "reaction" });
+  await startPlaytest(page, { tester: "Kasun", build: "Build A" });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(10000);
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  assert(await page.isHidden(".cmp-bar"), "with one playtest there is nothing to compare");
+  await page.click("button:has-text('Playtests')");
+  await startPlaytest(page, { tester: "Kasun", build: "Build B" });
+  await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
+  await page.waitForTimeout(3000); // still in the calm stretch of the clip
+  await page.click("#stop");
+  await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
+  await page.waitForSelector(".cmp-bar:not([hidden])");
+  const value = await page.$eval("#compare option:nth-child(2)", (o) => o.value);
+  await page.selectOption("#compare", value);
+  const text = await page.textContent("#compare-summary");
+  console.log(`  (${text.replace(/\s+/g, " ").trim()})`);
+  assert(/This playtest: .*0 possible delights/.test(text) && /Build A · Kasun · .*1 possible delight/.test(text), `summary: ${text}`);
+  await page.screenshot({ path: `${OUT}compare.png` });
+});
+
 await test("asks to retry calibration when no face is visible", async () => {
   const page = await launch({ camera: "pattern" });
   await startPlaytest(page);

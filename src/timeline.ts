@@ -13,6 +13,8 @@ export type TimelineOpts = {
   playhead?: number;
   selected?: string | null;
   threshold?: number;
+  /** Another session's samples, drawn dashed and faded behind this one's (compare builds). */
+  ghost?: Sample[];
   /** Time under the mouse, drawn as a faint guide. */
   hover?: number;
   /** Fixed size for canvases that aren't on the page (the highlight reel). */
@@ -75,10 +77,14 @@ export function drawTimeline(cv: HTMLCanvasElement, samples: Sample[], o: Timeli
   }
   if (lostFrom !== null && samples.length) g.fillRect(x(lostFrom), PAD.top, x(samples[samples.length - 1].t) - x(lostFrom), hgt - PAD.top - PAD.bottom);
 
-  // The two lines, broken wherever the face was missing or samples have a gap.
+  // The two lines, broken wherever the face was missing or samples have a gap. A compared session goes underneath, dashed.
+  for (const [data, faded] of [...(o.ghost ? [[o.ghost, true] as const] : []), [samples, false] as const])
   for (const [key, color] of [["f", "--frus"], ["d", "--joy"]] as const) {
+    const samples = data;
     g.strokeStyle = css(color);
-    g.lineWidth = 2;
+    g.globalAlpha = faded ? 0.45 : 1;
+    g.setLineDash(faded ? [5, 4] : []);
+    g.lineWidth = faded ? 1.5 : 2;
     g.lineJoin = "round";
     g.beginPath();
     let prev: Sample | null = null;
@@ -94,6 +100,8 @@ export function drawTimeline(cv: HTMLCanvasElement, samples: Sample[], o: Timeli
     }
     g.stroke();
   }
+  g.globalAlpha = 1;
+  g.setLineDash([]);
 
   // Pins.
   for (const m of o.moments ?? []) {

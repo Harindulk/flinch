@@ -221,3 +221,13 @@ button.flash { background: var(--mark); color: #1b1203; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Compare builds */
+.cmp-bar { display: grid; grid-template-columns: auto minmax(0, 260px); gap: 8px 16px; align-items: center; padding: 10px 16px 4px; background: var(--panel); }
+.cmp-key { color: var(--muted); font-size: 13px; }
+.cmp-bar select { font: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 10px; }
+.cmp-summary { grid-column: 1 / -1; display: grid; gap: 2px; }
+.cmp-summary:empty { display: none; }
+.cmp-summary p { margin: 0; font-size: 14px; color: var(--muted); }
+.cmp-summary b { color: var(--text); font-weight: 600; }
+.cmp-summary .cmp-verdict { color: var(--text); font-weight: 600; margin-top: 4px; }
