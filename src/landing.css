@@ -39,6 +39,7 @@
 .l-stage { position: absolute; left: max(46%, calc(50% - 54px)); right: 0; top: clamp(16px, 3vh, 40px); bottom: 0; max-height: 760px; background: var(--frus);
   clip-path: polygon(0 72px, 72px 0, 100% 0, 100% 100%, 0 100%); }
 .l-stage-inner { position: absolute; left: 56px; right: 40px; top: 56px; }
+.landing .l-sample { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: #111214; }
 
 /* The working Review fragment (product conventions inside data-ui) */
 .d-review { width: 100%; max-width: 640px; background: var(--bg); border-radius: 8px; overflow: hidden; color: var(--text); font-size: 14px; }

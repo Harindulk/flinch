@@ -139,7 +139,7 @@ function hero(action: HTMLElement, ok: boolean, saved: HTMLElement) {
       h("p", { class: "l-meta" }, "Free and open source · desktop Chrome or Edge · no account, nothing uploaded"),
     ),
     h("div", { class: "l-stage shutter" },
-      h("div", { class: "l-stage-inner" }, reviewDemo(jolt)),
+      h("div", { class: "l-stage-inner" }, h("p", { class: "l-sample" }, "Sample playtest, drawn for this page. Click a moment to replay it."), reviewDemo(jolt)),
     ),
   );
 }
