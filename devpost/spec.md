@@ -84,6 +84,10 @@ PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`.
 `src/timeline.ts`: one canvas drawing function used by both the live strip (last 30 s) and the review timeline (whole session, with pins and a playhead). Gaps where there was no face.
 PRD ref: `prd.md > Features and Behavior > Live reaction line`, `> Review and notes`.
 
+### Landing page
+`src/screens/home.ts`, `src/landing/demo.ts`, `src/landing.css`: the home screen is also the product's landing page. Its hero is a working fragment of the Review screen: clicking a pin replays that moment of a drawn game level with a drawn tester's face (`reviewDemo`). The sections below show more real fragments (a moment card that can be kept, the setup and recording bars, the exports) and four credited Creative Commons photographs of game jams and play. Returning visitors see their saved playtests right under the hero. Built with the `design-taste-frontend` skill: 0 failures on its inspector at 1440, 768 and 390 px, and no axe violations.
+PRD ref: `prd.md > Screens and Layout` (Home).
+
 ### Labels and icons
 `src/labels.ts`: the calibrated words used everywhere ("Possible frustration", "Expression change"), so the app never presents an inferred feeling as fact. `src/icons.ts`: a few inline 16 px SVG icons; no icon font or network.
 PRD ref: `prd.md > Features and Behavior > Automatic bookmarks`.

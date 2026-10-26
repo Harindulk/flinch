@@ -5,14 +5,14 @@ import { show, type Screen } from "../nav";
 import { homeScreen } from "./home";
 import { recordScreen } from "./record";
 
-export function setupScreen(): Screen {
+export function setupScreen(prefill: { tester?: string; build?: string } = {}): Screen {
   return (root) => {
     let game: MediaStream | null = null;
     let cam: MediaStream | null = null;
     let handedOff = false;
 
-    const tester = h("input", { id: "tester", placeholder: "e.g. Kasun", maxLength: 40, autocomplete: "off" });
-    const build = h("input", { id: "build", placeholder: "e.g. Drive Away 0.9", maxLength: 60, autocomplete: "off" });
+    const tester = h("input", { id: "tester", placeholder: "e.g. Kasun", maxLength: 40, autocomplete: "off", value: prefill.tester ?? "" });
+    const build = h("input", { id: "build", placeholder: "e.g. Drive Away 0.9", maxLength: 60, autocomplete: "off", value: prefill.build ?? "" });
     const consent = h("input", { type: "checkbox", id: "consent" });
     const start = h("button", { class: "primary big", id: "calibrate", disabled: true }, "Calibrate and start");
     const missing = h("p", { class: "missing", id: "missing", role: "status" });

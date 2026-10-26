@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./landing.css";
 import { mount, show } from "./nav";
 import { homeScreen } from "./screens/home";
 import { reviewScreen } from "./screens/review";

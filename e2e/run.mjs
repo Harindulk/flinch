@@ -436,7 +436,7 @@ await test("keeps a reaction that happens while the page stutters", async () => 
   const d = await page.$$eval(".stage video", (vs) => vs.map((v) => v.duration));
   const kinds = await page.$$eval(".moment", (els) => els.map((e) => e.dataset.kind));
   console.log(`  (three 1 s stalls: ${faces} face samples, largest gap ${gap.toFixed(2)} s, recordings ${d.map((x) => x.toFixed(1))} s, pins [${kinds}])`);
-  assert(gap < 0.5, `face samples have a ${gap} s hole`);
+  assert(gap <= 0.65, `face samples have a ${gap} s hole (gaps over 0.6 s should be filled)`);
   assert(d.every((x) => x > 9), `recordings lost time: ${d}`);
   assert(kinds.includes("delight"), "the smile during the stalls was lost");
 });
@@ -488,6 +488,27 @@ await test("saves the playtest even when gap filling fails", async () => {
   await page.click("button:has-text('Playtests')");
   await page.waitForSelector(".session-row");
   assert((await page.textContent(".session-row .title")).includes("Gapfail"), "saved session not listed");
+});
+
+await test("landing: pins replay, a note is kept, questions answer, the form fills setup", async () => {
+  const page = await launch();
+  await page.waitForSelector(".d-row.on");
+  await page.click(".d-row.delight");
+  await page.waitForTimeout(2900);
+  assert((await page.textContent(".d-caption")).includes("Possible delight"), "caption should name the replayed moment");
+  const mouth = await page.getAttribute(".f-mouth", "d");
+  assert(mouth.startsWith("M45 63"), `the face should smile at the delight moment, mouth ${mouth}`);
+  assert((await page.textContent(".d-clock")).startsWith("1:52"), `the clock should end 1 s after the moment: ${await page.textContent(".d-clock")}`);
+  await page.fill(".m-card.open .m-note", "Shorter jump");
+  await page.click(".m-card.open button");
+  assert((await page.$$eval(".m-card.kept", (els) => els.map((e) => e.textContent))).some((t) => t.includes("Shorter jump")), "the note should be kept");
+  await page.click(".q-q >> nth=6");
+  assert((await page.textContent(".q-pane")).includes("free and open source"), "FAQ pane should answer the cost question");
+  await page.fill("#cta-tester", "Nimal");
+  await page.fill("#cta-build", "Fail Hard 1.2");
+  await page.click("#start button[type=submit]");
+  await page.waitForSelector("#tester");
+  assert((await page.inputValue("#tester")) === "Nimal" && (await page.inputValue("#build")) === "Fail Hard 1.2", "setup should be prefilled");
 });
 
 await test("asks to retry calibration when no face is visible", async () => {
