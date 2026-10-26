@@ -34,6 +34,13 @@ async function fixture(kind = "face") {
     return y4m;
   }
   const calm = await asset("business-person.png");
+  if (kind === "reaction-late") {
+    // Like "reaction", but calm for 24 s: calibration stays clear of the smile even when the face model downloads slowly.
+    execFileSync("ffmpeg", ["-loglevel", "error", "-y",
+      "-loop", "1", "-t", "24", "-i", calm, "-loop", "1", "-t", "3", "-i", smile, "-loop", "1", "-t", "10", "-i", calm,
+      "-filter_complex", `[0]${FIT}[a];[1]${FIT}[b];[2]${FIT}[c];[a][b][c]concat=n=3:v=1[v]`, "-map", "[v]", "-r", "15", "-pix_fmt", "yuv420p", y4m]);
+    return y4m;
+  }
   if (kind === "dim") {
     // The reaction video at about a third of the light, with less contrast: a dim room.
     const src = await fixture("reaction");
@@ -421,14 +428,14 @@ await test("keeps a reaction that happens while the page stutters", async () => 
   // Stand-in for a busy or background page: three 1 s stalls of the page's own thread while the
   // tester smiles. (Automated Chromium never reports a tab as hidden, so a real background tab
   // can't be reproduced here.) Live face reads that go missing are read back from the recording.
-  const page = await launch({ camera: "reaction" }); // the smile lands ~4–7 s in
+  const page = await launch({ camera: "reaction-late" }); // the smile lands 4–12 s in
   await startPlaytest(page);
   await page.waitForSelector("#stop:not([disabled])", { timeout: 30000 });
   for (let i = 0; i < 3; i++) {
     await page.waitForTimeout(1000);
     await page.evaluate(() => { const t = performance.now(); while (performance.now() - t < 1000) {} });
   }
-  await page.waitForTimeout(8000); // long enough that the fixture's smile is inside the recording even on a slow model load
+  await page.waitForTimeout(14000); // long enough that the fixture's smile is inside the recording even on a slow model load
   await page.click("#stop");
   await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
   const faces = Number(await page.getAttribute("#review", "data-faces"));
