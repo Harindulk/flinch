@@ -3,11 +3,101 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Flinch — playtest reactions</title>
+    <title>Flinch: the playtest recorder that pins player reactions</title>
+    <meta name="description" content="Record your game and your tester's face in one Chrome tab. Flinch pins each moment their expression changed, so you can replay and fix it. Free, no uploads." />
+    <link rel="canonical" href="https://flinch.starfungames.com/" />
+    <meta name="theme-color" content="#111214" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="author" content="StarFun Games" />
+
+    <!-- Sharing previews: social sites read these from the raw HTML, before any script runs. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Flinch" />
+    <meta property="og:url" content="https://flinch.starfungames.com/" />
+    <meta property="og:title" content="Flinch: see the moment your playtester flinched" />
+    <meta property="og:description" content="A free, local-first playtest recorder for game devs. It records the game and the tester's face, pins every possible frustration and delight, and replays the moment. Nothing leaves your computer." />
+    <meta property="og:image" content="https://flinch.starfungames.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Flinch: a game level with the tester's face frowning in the corner, a red spike on the reaction line and a pin at 0:42, possible frustration." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Flinch: see the moment your playtester flinched" />
+    <meta name="twitter:description" content="Records the game and the tester's face, pins every possible frustration and delight, replays the moment. Free, runs in one Chrome tab, uploads nothing." />
+    <meta name="twitter:image" content="https://flinch.starfungames.com/og-image.png" />
+    <meta name="twitter:image:alt" content="Flinch replaying a possible-frustration moment: the game, the tester's frowning face and a red spike on the timeline." />
+
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M2 22 L10 22 L14 8 L18 26 L22 16 L30 16' fill='none' stroke='%23ff5d5d' stroke-width='3' stroke-linejoin='round'/></svg>" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./site.webmanifest" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://flinch.starfungames.com/#app",
+            "name": "Flinch",
+            "url": "https://flinch.starfungames.com/",
+            "description": "A free, local-first browser playtest recorder for game developers. It records the game window and the tester's webcam, measures facial-expression changes against the tester's resting face, pins possible frustration and delight, and replays each moment. Nothing is uploaded.",
+            "applicationCategory": "DeveloperApplication",
+            "applicationSubCategory": "Game playtesting",
+            "operatingSystem": "Web browser (desktop Chrome or Edge)",
+            "browserRequirements": "Requires desktop Chrome or Edge with a webcam.",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "image": "https://flinch.starfungames.com/og-image.png",
+            "screenshot": "https://flinch.starfungames.com/og-image.png",
+            "license": "https://opensource.org/licenses/MIT",
+            "codeRepository": "https://github.com/Harindulk/flinch",
+            "featureList": [
+              "Records the game window and the tester's webcam together",
+              "Ten-second calibration to each tester's resting face",
+              "Live reaction line while recording",
+              "Automatic pins on possible frustration and delight",
+              "Replay from three seconds before each moment",
+              "Compare two playtests of different builds",
+              "Markdown fix list, recordings and an MP4 highlight reel",
+              "Runs locally in the browser; nothing is uploaded"
+            ],
+            "publisher": { "@id": "https://flinch.starfungames.com/#org" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://flinch.starfungames.com/#org",
+            "name": "StarFun Games",
+            "url": "https://starfungames.com/",
+            "sameAs": ["https://github.com/Harindulk"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://flinch.starfungames.com/#site",
+            "name": "Flinch",
+            "url": "https://flinch.starfungames.com/",
+            "publisher": { "@id": "https://flinch.starfungames.com/#org" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              { "@type": "Question", "name": "Does Flinch read emotions?", "acceptedAnswer": { "@type": "Answer", "text": "No. It measures how far the tester's face moves from their own resting face: brows, lips, smile. A pin says where to look; you decide what it meant." } },
+              { "@type": "Question", "name": "Does anything get uploaded?", "acceptedAnswer": { "@type": "Answer", "text": "No. The page, the face model and your recordings all stay in your browser. There's no account and no server." } },
+              { "@type": "Question", "name": "What do I need to use Flinch?", "acceptedAnswer": { "@type": "Answer", "text": "Desktop Chrome or Edge, a webcam, and a game in another window. The browser asks once for the camera and the window." } },
+              { "@type": "Question", "name": "What does Flinch cost?", "acceptedAnswer": { "@type": "Answer", "text": "Nothing. Flinch is free and open source under the MIT licence." } }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <noscript>
+        <h1>Flinch: see the moment your playtester flinched</h1>
+        <p>Flinch is a free playtest recorder for game developers. It records your game window and your tester's webcam in one Chrome tab, learns the tester's resting face in ten seconds, and pins every clear facial-expression change: possible frustration and possible delight. Click a pin to replay the game and the face from three seconds before. Export a Markdown fix list, the recordings and a highlight reel. Everything runs locally; nothing is uploaded.</p>
+        <p>Flinch needs JavaScript, desktop Chrome or Edge, and a webcam. Source code: <a href="https://github.com/Harindulk/flinch">github.com/Harindulk/flinch</a>.</p>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

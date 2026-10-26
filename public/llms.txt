@@ -1,0 +1,20 @@
+# Flinch
+
+> Flinch is a free, open-source (MIT), local-first playtest recorder for game developers, made by StarFun Games. It runs in one desktop Chrome or Edge tab, records the game window and the tester's webcam together, and pins the moments the tester's facial expression changed (possible frustration, possible delight), so the developer can replay each moment from three seconds before and fix it. Nothing is uploaded.
+
+## What it does
+- Records any game window (browser game, Unity or Godot build, emulator) plus the tester's webcam and microphone.
+- Learns each tester's resting face in a ten-second calibration, then scores brow, lip and smile movement against that rest, so a concentrated frown is not counted as frustration.
+- Draws a live reaction line while recording and pins clear changes after Stop. The developer can also press M to mark a moment.
+- Review: replay from three seconds before a pin, write a note, dismiss a wrong pin, compare with an earlier playtest of another build.
+- Exports: a Markdown fix list, the game and face recordings (WebM), and a highlight reel (MP4 where the browser supports it).
+- Flinch measures facial-expression changes, not feelings; a pin says where to look.
+
+## Privacy
+- The face model (Google MediaPipe Face Landmarker) runs in the browser, loaded from this site.
+- Recordings stay in the browser's storage until deleted. No account, no server, no analytics.
+
+## Links
+- App and landing page: https://flinch.starfungames.com/
+- Source code: https://github.com/Harindulk/flinch
+- Built for Devpost's Build With AI: Basics hackathon (October 2026) with the Devpost Learn skill pack.
