@@ -4,6 +4,8 @@ A browser playtest recorder for game devs. It records the game window and the te
 
 Everything runs in one Chrome tab. Recordings and face data stay in the browser on your computer; nothing is uploaded.
 
+**Try it live:** https://links.harindu.dev/flinch/ (desktop Chrome or Edge, with a webcam).
+
 ## Run it
 
 Needs Node 20+, desktop Chrome or Edge, and a webcam.

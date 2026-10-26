@@ -171,7 +171,9 @@ await test("pins a smile and a manual mark, and clicking a pin replays it", asyn
   assert(await page.isVisible("#fresh"), "a fresh session should announce what was found");
   await page.waitForFunction(() => document.querySelector(".moment.selected"), null, { timeout: 5000 });
   const openedAt = await page.$eval(".stage video.game", (v) => v.currentTime);
-  assert(openedAt > 2, `review should open just before the strongest moment, at ${openedAt}`);
+  const [mm, ss] = (await page.textContent(".moment.selected .time")).split(":").map(Number);
+  const expected = Math.max(0, mm * 60 + ss - 3); // 3 s lead-in, clamped at the start
+  assert(Math.abs(openedAt - expected) < 1.5, `review should open 3 s before the strongest moment (${mm}:${ss}), opened at ${openedAt}`);
   const kinds = await page.$$eval(".moment", (els) => els.map((e) => e.dataset.kind));
   assert(kinds.includes("delight"), `expected a delight moment, got [${kinds}]`);
   assert(kinds.includes("mark"), `expected a manual mark, got [${kinds}]`);
