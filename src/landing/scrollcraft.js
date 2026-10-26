@@ -1,3 +1,5 @@
+/* scroll-craft engine by Nate Herk, https://github.com/nateherkai/scroll-craft
+   MIT licence, copyright (c) 2026 Nate Herk: see scrollcraft.LICENSE beside this file. Vendored unmodified below. */
 /* ============================================================================
    scrollcraft: a scroll-driven interaction runtime
    ----------------------------------------------------------------------------

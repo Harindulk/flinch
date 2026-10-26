@@ -107,6 +107,7 @@ Built for Devpost's Build With AI: Basics hackathon (October 2026) with Claude C
 ## Credits and licence
 
 - [`@mediapipe/tasks-vision`](https://www.npmjs.com/package/@mediapipe/tasks-vision) and the Face Landmarker model (`public/models/face_landmarker.task`) are Google's, Apache-2.0.
+- The landing page's scroll engine (`src/landing/scrollcraft.js`) is [scroll-craft](https://github.com/nateherkai/scroll-craft) by Nate Herk, MIT, vendored unmodified with its licence beside it.
 - Landing page photographs, via Wikimedia Commons (credited in the page footer too):
   - "GitarFreaks and DrumMania V cabinets and player" by David Monniaux, CC BY-SA 3.0 ([source](https://commons.wikimedia.org/w/index.php?curid=426169))
   - "Global Game Jam 2012" by Laboratório Criação Digital, CC BY-SA 2.0 ([source](https://commons.wikimedia.org/w/index.php?curid=26510609))
