@@ -8,3 +8,4 @@ public/wasm/
 probe.html
 e2e/out/
 /.claude/launch.json
+/.taste-skill/

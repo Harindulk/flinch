@@ -428,7 +428,7 @@ await test("keeps a reaction that happens while the page stutters", async () => 
     await page.waitForTimeout(1000);
     await page.evaluate(() => { const t = performance.now(); while (performance.now() - t < 1000) {} });
   }
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(8000); // long enough that the fixture's smile is inside the recording even on a slow model load
   await page.click("#stop");
   await page.waitForSelector("#review[data-ready]", { timeout: 30000 });
   const faces = Number(await page.getAttribute("#review", "data-faces"));
