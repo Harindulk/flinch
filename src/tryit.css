@@ -1,0 +1,3 @@
+.y-say.y-error { color: var(--frus); }
+.y-next { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.y-next[hidden] { display: none; }

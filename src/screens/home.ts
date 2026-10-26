@@ -62,9 +62,15 @@ export function homeScreen(): Screen {
       };
       return el;
     };
+    const saved = h("a", { class: "l-saved", href: "#sessions", onclick: jump("sessions"), hidden: true });
     if (ok)
       listSessions().then(
-        (list) => list.length && sessions.replaceChildren(h("h2", { class: "label" }, "Your playtests on this computer"), ...list.map(row)),
+        (list) => {
+          if (!list.length) return;
+          saved.textContent = `Open your saved playtests (${list.length})`;
+          saved.hidden = false;
+          sessions.replaceChildren(h("h2", { class: "label" }, "Your playtests on this computer"), ...list.map(row));
+        },
         () => sessions.replaceChildren(h("p", { class: "notice warn" }, "This browser won't let Flinch store playtests (a private window?). You can still record; download each one before closing.")),
       );
 
@@ -88,7 +94,7 @@ export function homeScreen(): Screen {
           ok ? h("button", { class: "primary small l-nav-cta", type: "button", onclick: start }, "Start a playtest") : null,
         ),
         h("main", {},
-          hero(action),
+          hero(action, ok, saved),
           sessions,
           tryit.el,
           problem(),
@@ -114,7 +120,7 @@ const jump = (id: string) => (e: Event) => {
   document.getElementById(id)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 };
 
-function hero(action: HTMLElement) {
+function hero(action: HTMLElement, ok: boolean, saved: HTMLElement) {
   // The headline flinches with the demo: each time the drawn tester frowns, the word jolts once.
   const word = h("span", { class: "l-flinch" }, "flinched");
   const jolt = (kind: string) => {
@@ -126,9 +132,11 @@ function hero(action: HTMLElement) {
   return h("header", { class: "l-hero" },
     h("div", { class: "l-wrap l-hero-copy" },
       h("h1", {}, "See the moment they ", word, "."),
-      h("p", { class: "l-lede" }, "Flinch records your game and your tester's face, then pins every sigh, groan and grin so you can replay it. It runs in one Chrome tab and uploads nothing."),
-      action,
-      h("a", { class: "l-try-link", href: "#try", onclick: jump("try") }, "or try it on your own face first"),
+      h("p", { class: "l-lede" }, "Find the gameplay moments your playtesters couldn't put into words."),
+      h("p", { class: "l-sub" }, "Testers say “it was fine.” Flinch records the game and their webcam, pins each moment their face clearly changed from rest, and replays game and face in sync."),
+      h("div", { class: "l-actions" }, action, ok ? h("a", { class: "l-try-link", href: "#try", onclick: jump("try") }, "or try it on your own face first") : null),
+      saved,
+      h("p", { class: "l-meta" }, "Free and open source · desktop Chrome or Edge · no account, nothing uploaded"),
     ),
     h("div", { class: "l-stage shutter" },
       h("div", { class: "l-stage-inner" }, reviewDemo(jolt)),
@@ -175,7 +183,7 @@ function showcase() {
   const live = card("open");
   const state = (word: string, el: HTMLElement) => h("div", { class: "s-row" }, h("p", { class: "s-word" }, word), el);
   return h("section", { class: "l-showcase l-wrap", id: "showcase" },
-    h("h2", {}, "Every pin becomes a fix"),
+    h("h2", {}, "From pin to fix list"),
     state("Pinned", card("pinned")),
     state("Replayed", live),
     state("On the list", card("kept", "Long jump: move the ledge one tile closer")),
@@ -240,7 +248,8 @@ function takeaway() {
   );
   const files = h("div", { class: "f-files", dataset: { ui: "" } } as never,
     ...[["flinch-kasun-drive-away-0-9-2026-10-26-game.webm", "56 MB"], ["flinch-kasun-drive-away-0-9-2026-10-26-face.webm", "22 MB"], ["flinch-kasun-drive-away-0-9-2026-10-26-reel.mp4", "6 MB"]].map(([n, s]) =>
-      h("div", { class: "f-file" }, icon("download"), h("span", { class: "f-name" }, n), h("span", { class: "f-size" }, s))),
+      // The stem truncates; the tail stays so the file type is always visible.
+      h("div", { class: "f-file" }, icon("download"), h("span", { class: "f-name", title: n }, h("span", {}, n.slice(0, n.lastIndexOf("-"))), h("span", {}, n.slice(n.lastIndexOf("-")))), h("span", { class: "f-size" }, s))),
   );
   const row = (title: string, text: string, frag: HTMLElement, cls = "") =>
     h("div", { class: `t-row ${cls}` }, h("div", { class: "t-copy" }, h("h3", {}, title), h("p", {}, text)), h("div", { class: "t-frag" }, frag));
@@ -268,14 +277,14 @@ function compareFragment() {
   const wrap = document.createElement("div");
   wrap.innerHTML = `<svg viewBox="0 0 570 90" class="c-line" aria-hidden="true">
     <line x1="8" x2="562" y1="82.5" y2="82.5" stroke="#2a2d33"/><line x1="8" x2="562" y1="59.5" y2="59.5" stroke="#2a2d33" stroke-dasharray="3 4"/>
-    <polyline points="${pts(6.4)}" fill="none" stroke="#ff5d5d" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.5"/>
+    <polyline points="${pts(5.8)}" fill="none" stroke="#ff5d5d" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.5"/>
     <polyline points="${pts(0.6)}" fill="none" stroke="#ff5d5d" stroke-width="2"/></svg>`;
   return h("div", { class: "f-compare", dataset: { ui: "" } },
     wrap.firstElementChild as SVGSVGElement,
-    h("div", { class: "f-cmp-row" }, h("span", { class: "f-cmp-key" }, "Dashed: Drive Away 0.9"), h("span", { class: "f-cmp-sel" }, "Drive Away 0.9 · Kasun · 24 Oct")),
-    h("p", {}, h("b", {}, "This playtest: "), "0 possible frustrations · 1 possible delight"),
-    h("p", {}, h("b", {}, "Drive Away 0.9: "), "3 possible frustrations, strongest 6.4× · 0 possible delights"),
-    h("p", { class: "f-cmp-verdict" }, "Fewer frustration pins than Drive Away 0.9, and no stronger. More delight too."),
+    h("div", { class: "f-cmp-row" }, h("span", { class: "f-cmp-key" }, "Dashed: Drive Away 0.9"), h("span", { class: "f-cmp-sel" }, "Drive Away 0.9 · Kasun · 26 Oct")),
+    h("p", {}, h("b", {}, "This playtest (Drive Away 1.0): "), "0 possible frustrations · 2 possible delights"),
+    h("p", {}, h("b", {}, "Drive Away 0.9: "), "1 possible frustration, strongest 5.8× · 1 possible delight"),
+    h("p", { class: "f-cmp-verdict" }, "Fewer frustration pins than Drive Away 0.9, and no stronger. More possible delight too."),
   );
 }
 

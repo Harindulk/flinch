@@ -11,7 +11,9 @@ import { KIND_LABEL, strengthText } from "../labels";
 import { findMoments, THRESHOLD } from "../moments";
 import { calibrate, rawSignals, Scorer, type Raw } from "../signals";
 import { drawTimeline } from "../timeline";
+import { show } from "../nav";
 import type { Moment, Sample } from "../types";
+import "../tryit.css";
 
 const CALIB_S = 4; // shorter than a real playtest's ten: this is a taster
 const LIMIT_S = 60;
@@ -30,11 +32,16 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
   const strip = h("canvas", { class: "y-strip", role: "img", ariaLabel: "Your live reaction line" });
   const example = h("span", { class: "y-example" }, "Example line");
   const pinsEl = h("div", { class: "y-pins", id: "try-pins" });
+  // Dynamic import: setup imports home, which imports this file.
+  const next = h("div", { class: "y-next", hidden: true },
+    h("button", { class: "primary", id: "try-next", type: "button", onclick: () => void import("../screens/setup").then((m) => show(m.setupScreen())) }, "Start a real playtest"),
+    h("span", { class: "y-small" }, "Records the game window too, so every pin replays what was on screen."),
+  );
   const startBtn = h("button", { class: "primary l-cta", id: "try-camera", type: "button", disabled: !browserSupported() }, icon("camera"), "Turn on my camera");
   const stopBtn = h("button", { class: "secondary", id: "try-stop", type: "button", hidden: true }, icon("stop"), "Turn it off");
   const panel = h("div", { class: "y-panel idle", dataset: { ui: "" } },
     h("div", { class: "y-cam" }, video, h("div", { class: "y-idle" }, icon("face", "big"), h("span", {}, "Your face appears here"))),
-    h("div", { class: "y-live" }, say, h("div", { class: "y-strip-wrap" }, strip, example), pinsEl),
+    h("div", { class: "y-live" }, say, h("div", { class: "y-strip-wrap" }, strip, example), pinsEl, next),
   );
 
   // While the camera is off, an example line drifts by (clearly labelled) so the panel shows what's coming.
@@ -51,15 +58,26 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
     drawTimeline(strip, pts, { from: 0, to: WINDOW_S, threshold: THRESHOLD });
     if (!matchMedia("(prefers-reduced-motion: reduce)").matches) idleRaf = requestAnimationFrame(idle);
   };
-  requestAnimationFrame(idle);
+  idleRaf = requestAnimationFrame(idle);
 
   let cam: MediaStream | null = null;
   let reader: FaceReader | null = null;
   let tick = 0, raf = 0;
+  let run = 0; // bumped by every start and stop, so a start still awaiting the camera or model knows it was cancelled
+  let timers: number[] = [];
   const snaps: { t: number; src: string }[] = [];
   const snapCanvas = h("canvas", { width: 160, height: 120 });
 
+  const tell = (text: string, error = false) => {
+    say.textContent = text;
+    say.classList.toggle("y-error", error);
+  };
+  const later = (ms: number, text: string) => timers.push(window.setTimeout(() => tell(text), ms));
+
   const stop = () => {
+    run++;
+    timers.forEach(clearTimeout);
+    timers = [];
     clearInterval(tick);
     cancelAnimationFrame(raf);
     reader?.stop();
@@ -73,7 +91,14 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
     cancelAnimationFrame(idleRaf);
     idleRaf = requestAnimationFrame(idle);
     startBtn.hidden = false;
+    startBtn.disabled = !browserSupported();
     stopBtn.hidden = true;
+  };
+  const again = () => startBtn.replaceChildren(icon("camera"), "Try again");
+  const fail = (text: string) => {
+    stop();
+    tell(text, true);
+    again();
   };
 
   const renderPins = (moments: Moment[]) => {
@@ -89,15 +114,30 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
   };
 
   const start = async () => {
+    stop();
+    const me = run;
+    snaps.length = 0;
+    pinsEl.replaceChildren();
+    next.hidden = true;
     startBtn.disabled = true;
-    say.textContent = "Asking for the camera…";
-    try {
-      cam = await openCameraOnly();
-    } catch (e) {
-      say.textContent = e instanceof CaptureError ? e.message : "Couldn't open the camera.";
+    tell("Asking for the camera…");
+    // An embedded browser can leave the request hanging with no prompt: explain, and let them ask again.
+    timers.push(window.setTimeout(() => {
+      tell("No camera prompt? Look for the camera icon in the address bar. Browsers built into other apps often can't use the camera: open this page in Chrome.");
       startBtn.disabled = false;
+      again();
+    }, 8000));
+    let stream: MediaStream;
+    try {
+      stream = await openCameraOnly();
+    } catch (e) {
+      if (me === run) fail(e instanceof CaptureError ? e.message : "Couldn't open the camera. Check it's plugged in and not used by another app, then try again.");
       return;
     }
+    if (me !== run) return stopStream(stream); // turned off (or left the page) while the prompt was open
+    timers.forEach(clearTimeout);
+    timers = [];
+    cam = stream;
     video.srcObject = cam;
     video.hidden = false;
     cancelAnimationFrame(idleRaf);
@@ -106,17 +146,21 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
     startBtn.hidden = true;
     stopBtn.hidden = false;
     startBtn.disabled = false;
-    say.textContent = "Loading the face reader…";
-    const slow = setTimeout(() => (say.textContent = "Still downloading the face model (about 17 MB). Only the first time."), 6000);
+    tell("Loading the face reader…");
+    later(6000, "Still downloading the face model (about 17 MB). Only the first time.");
+    later(30000, "This is taking a while: a slow connection can need a minute. Keep waiting, or turn it off and try again.");
+    let r: FaceReader;
     try {
-      reader = await FaceReader.start(cam);
-      clearTimeout(slow);
+      r = await FaceReader.start(cam);
     } catch {
-      clearTimeout(slow);
-      say.textContent = "The face reader couldn't start. Reload the page and try again.";
-      stop();
+      if (me === run) fail("The face reader couldn't start. Check your connection, then press Try again.");
       return;
     }
+    if (me !== run) return r.stop();
+    timers.forEach(clearTimeout);
+    timers = [];
+    reader = r;
+    reader.onCrash = () => me === run && fail("The face reader stopped unexpectedly. Press Try again.");
     const calib: Raw[] = [];
     const samples: Sample[] = [];
     let scorer: Scorer | null = null;
@@ -139,7 +183,7 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
       const el = (now - t0) / 1000;
       const lost = now - lastFace > 1000;
       if (phase === "calib") {
-        say.textContent = lost ? "Can't see your face yet: sit closer, face a light." : `Hold still, resting face… ${Math.max(1, Math.ceil(CALIB_S - el))}`;
+        tell(lost ? "Can't see your face yet: face the camera and move into the light." : `Hold still, resting face… ${Math.max(1, Math.ceil(CALIB_S - el))}`);
         if (el < CALIB_S) return;
         if (calib.length < 15) {
           t0 = now; // keep calibrating until there's enough of a face
@@ -153,11 +197,13 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
       }
       if (el > LIMIT_S) {
         stop();
-        say.textContent = moments.length ? "That's the idea. In a real playtest each pin replays the game and the face together." : "No clear changes that time. Try again with a bigger frown or grin.";
+        tell(moments.length ? "That's the idea. In a real playtest each pin replays the game and the face together." : "No clear expression changes that time. Try again with a bigger frown or grin.");
+        again();
+        next.hidden = !moments.length;
         return;
       }
       const prompt = [...PROMPTS].reverse().find(([s]) => el >= s)![1];
-      say.textContent = lost ? "Face lost: come back into the camera." : prompt;
+      tell(lost ? "Can't see your face: face the camera and move into the light." : prompt);
       // A face snapshot every quarter second, kept for the last minute, so each pin can show the face at its peak.
       const g = snapCanvas.getContext("2d")!;
       g.save();
@@ -183,8 +229,11 @@ export function tryIt(): { el: HTMLElement; stop: () => void } {
 
   startBtn.onclick = () => void start();
   stopBtn.onclick = () => {
+    const pinned = pinsEl.childElementCount > 0;
     stop();
-    say.textContent = "Camera off. Nothing was recorded.";
+    tell("Camera off. Nothing was recorded.");
+    again();
+    next.hidden = !pinned;
   };
 
   const el = h("section", { class: "l-try l-wrap", id: "try" },
