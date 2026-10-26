@@ -31,9 +31,16 @@ export function rawSignals(s: Shapes): { f: number; d: number } {
 // A perfectly still face during calibration would make tiny twitches look huge; these floors stop that.
 export const SD_FLOOR = { f: 0.025, d: 0.025, loud: 0.01 };
 
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
+  return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : 0;
+};
+
+// Median and median spread (scaled to match a normal sd), so a laugh, cough or glance away during
+// calibration doesn't raise the resting level and widen the spread until real reactions stop counting.
 function stat(xs: number[], floor: number): Stat {
-  const mean = xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
-  const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (xs.length || 1));
+  const mean = median(xs);
+  const sd = 1.4826 * median(xs.map((x) => Math.abs(x - mean)));
   return { mean, sd: Math.max(sd, floor) };
 }
 

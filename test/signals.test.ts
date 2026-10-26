@@ -35,6 +35,21 @@ describe("calibrate", () => {
     expect(b.loud.sd).toBe(SD_FLOOR.loud);
   });
 
+  it("isn't thrown off by a laugh during calibration, so later smiles still stand out", () => {
+    const rest = { ...rawSignals(neutral), loud: 0.01 };
+    const laugh = { ...rawSignals(smiling), loud: 0.3 };
+    const b = calibrate(Array.from({ length: 150 }, (_, i) => (i >= 60 && i < 75 ? laugh : rest)));
+    expect(b.d.mean).toBeCloseTo(rest.d);
+    expect(b.d.sd).toBe(SD_FLOOR.d);
+    expect(zScore(rawSignals(smiling).d, b.d)).toBeGreaterThan(10);
+    expect(zScore(0.3, b.loud)).toBeGreaterThan(10);
+  });
+
+  it("copes with an empty or tiny calibration", () => {
+    expect(calibrate([]).f).toEqual({ mean: 0, sd: SD_FLOOR.f });
+    expect(calibrate([{ f: 0.1, d: 0.2, loud: 0 }, { f: 0.3, d: 0.2, loud: 0 }]).f.mean).toBeCloseTo(0.2);
+  });
+
   it("learns a frowny resting face, so the same frown later scores as normal", () => {
     const frowny = rawSignals(frowning);
     const b = calibrate(Array(50).fill({ ...frowny, loud: 0 }));

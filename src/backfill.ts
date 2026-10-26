@@ -11,6 +11,15 @@ import type { Sample } from "./types";
 export const GAP_S = 0.6; // live reads arrive ~15 times a second; a longer silence is a gap
 export const FILL_FPS = 10;
 export const MAX_FILL_S = 300; // shortcut: past five minutes of gaps, leave the rest rather than keep the tester waiting
+export const MAX_FILL_MS = 120_000; // and never spend more than two minutes of wall time on it
+const SEEK_MS = 4000;
+
+/** Rejects if `p` hasn't settled within `ms`, so a stuck video seek can't hold up saving. */
+export const within = <T>(p: Promise<T>, ms: number, message: string) =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    p.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
 
 /** Stretches with no live face read, including before the first and after the last. Pure: unit-tested. */
 export function findGaps(samples: Sample[], duration: number): [number, number][] {
@@ -33,13 +42,14 @@ export async function fillGaps(samples: Sample[], face: Blob, duration: number, 
   const video = h("video", { muted: true, playsInline: true });
   const reader = await FaceReader.backfill();
   let done = 0;
+  const deadline = performance.now() + MAX_FILL_MS;
   try {
     await loadVideo(video, face);
     const end = Math.min(duration, video.duration || duration);
     for (const [from, to] of gaps) {
       const scorer = new Scorer(baseline);
-      for (let t = from + 1 / FILL_FPS; t < Math.min(to, end) && done < total; t += 1 / FILL_FPS) {
-        await seekTo(video, t);
+      for (let t = from + 1 / FILL_FPS; t < Math.min(to, end) && done < total && performance.now() < deadline; t += 1 / FILL_FPS) {
+        await within(seekTo(video, t), SEEK_MS, "The face recording stopped seeking.");
         const { shapes } = await reader.read(await createImageBitmap(video), t);
         if (!shapes) {
           scorer.reset();

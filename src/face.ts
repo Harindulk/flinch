@@ -87,17 +87,24 @@ export class FaceReader {
       pending?.reject(new Error(message));
       pending = null;
     };
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve, rejectStart) => {
+      // The model is already cached from the live reader, so a slow start means it's stuck: give up and save without the fill.
+      const timer = setTimeout(() => reject(new Error("The face reader took too long to start.")), 20000);
+      const reject = (err: Error) => {
+        clearTimeout(timer);
+        worker.terminate();
+        rejectStart(err);
+      };
       worker.onerror = (e) => {
         reject(new Error(e.message || "The face reader failed to start."));
         fail(e.message || "The face reader stopped.");
       };
       worker.onmessage = (e: MessageEvent<Msg>) => {
-        if (e.data.type === "ready") resolve();
-        else if (e.data.type === "error") {
-          reject(new Error(e.data.message));
-          worker.terminate();
-        } else if (e.data.type === "face") pending?.resolve(e.data);
+        if (e.data.type === "ready") {
+          clearTimeout(timer);
+          resolve();
+        } else if (e.data.type === "error") reject(new Error(e.data.message));
+        else if (e.data.type === "face") pending?.resolve(e.data);
       };
       worker.postMessage({ base: document.baseURI, backfill: true });
     });

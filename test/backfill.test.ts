@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findGaps } from "../src/backfill";
+import { findGaps, within } from "../src/backfill";
 import type { Sample } from "../src/types";
 
 const at = (...ts: number[]): Sample[] => ts.map((t) => ({ t, f: 0, d: 0, loud: 0, face: true }));
@@ -19,5 +19,15 @@ describe("findGaps", () => {
 
   it("treats a session with no reads as one gap", () => {
     expect(findGaps([], 3)).toEqual([[0, 3]]);
+  });
+});
+
+describe("within", () => {
+  it("passes a prompt answer through", async () => {
+    await expect(within(Promise.resolve(7), 50, "slow")).resolves.toBe(7);
+  });
+
+  it("fails a stuck step instead of waiting forever", async () => {
+    await expect(within(new Promise(() => {}), 20, "stuck seek")).rejects.toThrow("stuck seek");
   });
 });
