@@ -6,7 +6,8 @@ import { chromium } from "playwright-core";
 
 const OUT = new URL("./out/", import.meta.url).pathname;
 const PORT = 5287;
-const URL_ = `http://localhost:${PORT}/`;
+// E2E_URL=http://host/path/ tests an already-running site (e.g. the build served under a sub-path, like GitHub Pages).
+const URL_ = process.env.E2E_URL ?? `http://localhost:${PORT}/`;
 mkdirSync(OUT, { recursive: true });
 
 const FIT = "scale=640:480:force_original_aspect_ratio=decrease,pad=640:480:(ow-iw)/2:(oh-ih)/2,setsar=1";
@@ -63,10 +64,10 @@ async function fixture(kind = "face") {
 }
 
 // E2E_PREVIEW=1 tests the production build (npm run build first) instead of the dev server.
-const server = spawn("npx", process.env.E2E_PREVIEW ? ["vite", "preview", "--port", String(PORT), "--strictPort"] : ["vite", "--port", String(PORT), "--strictPort"], { stdio: "pipe" });
-const stopServer = () => server.kill();
+const server = process.env.E2E_URL ? null : spawn("npx", process.env.E2E_PREVIEW ? ["vite", "preview", "--port", String(PORT), "--strictPort"] : ["vite", "--port", String(PORT), "--strictPort"], { stdio: "pipe" });
+const stopServer = () => server?.kill();
 process.on("exit", stopServer);
-await new Promise((ok, fail) => {
+if (server) await new Promise((ok, fail) => {
   server.stdout.on("data", (d) => String(d).includes("Local") && ok());
   setTimeout(() => fail(new Error("vite did not start")), 20000);
 });

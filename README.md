@@ -54,6 +54,7 @@ npm test        # unit tests: signals, moments, gaps, notes export
 npm run e2e     # headless Chromium (muted) with a fake camera, mic and screen: 11 journeys incl. failures
 npm run build && E2E_PREVIEW=1 npm run e2e   # the same against the production build
 SOAK_MIN=10 npm run e2e -- soak             # a 10-minute recording, sampling memory
+E2E_URL=http://host/flinch/ npm run e2e     # against a site that's already running, e.g. under a sub-path like GitHub Pages
 ```
 
 The end-to-end run downloads two of MediaPipe's public test images into `e2e/out/` and splices them into a fake camera video (a calm face, then a smile), so the whole path from face to pin to reel is exercised without a real webcam.
