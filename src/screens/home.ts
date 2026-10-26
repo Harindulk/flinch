@@ -224,9 +224,9 @@ function howItWorks() {
   return h("section", { class: "l-how l-wrap", id: "how" },
     h("h2", {}, "How a playtest runs"),
     h("ol", { class: "h-steps" },
-      step("First, pick the game window and turn on the camera.", pickBtn, picked),
-      step("Then, ten seconds of resting face.", calib, tracked),
-      step("Then they play, and you press Stop.", recBar, pins, true),
+      step("Pick the game window and turn on the camera.", pickBtn, picked),
+      step("Ten seconds of resting face.", calib, tracked),
+      step("They play. You press Stop, and the pins are waiting.", recBar, pins, true),
     ),
     h("figure", { class: "l-how-pic" }, photo(PHOTOS.jam, "wide"), h("figcaption", {}, "Any game window works: a browser build, a Unity or Godot player, an emulator.")),
   );
